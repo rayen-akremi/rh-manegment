@@ -1,0 +1,249 @@
+/* Turnover page - version avec contenu décalé à gauche */
+.turnover-page {
+  margin-left: 275px;  /* au lieu de 280px */
+  padding: 2rem 1.5rem 2rem 1rem;  /* padding gauche réduit */
+  background: #f8fafc;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.page-header h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+.page-header p {
+  color: #475569;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+/* KPI Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.kpi-card {
+  background: white;
+  border-radius: 20px;
+  padding: 1rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.kpi-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 0.3rem;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.kpi-trend {
+  font-size: 0.7rem;
+  margin-top: 0.3rem;
+}
+.kpi-trend.up {
+  color: #ef4444;
+}
+.kpi-trend.down {
+  color: #10b981;
+}
+.kpi-trend.neutral {
+  color: #64748b;
+}
+
+/* Two columns layout */
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.chart-card {
+  background: white;
+  border-radius: 24px;
+  padding: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+.chart-card h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+  color: #0f172a;
+}
+.chart-subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+/* Pie chart legend */
+.pie-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.legend-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* AI Insights */
+.ai-insights {
+  background: white;
+  border-radius: 24px;
+  padding: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+.ai-insights h3 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+.section-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+.insight-card {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  border-radius: 16px;
+  background: #fefce8;
+  border-left: 4px solid #eab308;
+}
+.insight-card.critical {
+  background: #fee2e2;
+  border-left-color: #ef4444;
+}
+.insight-card.warning {
+  background: #fff3e3;
+  border-left-color: #f97316;
+}
+.insight-card.action {
+  background: #e0f2fe;
+  border-left-color: #0ea5e9;
+}
+.insight-icon {
+  font-size: 1.4rem;
+}
+.insight-card strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.insight-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+/* Registre table */
+.registre-section {
+  background: white;
+  border-radius: 24px;
+  padding: 1.2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  margin-top: 1rem;
+}
+.registre-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.registre-header h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+.registre-header span {
+  background: #e2e8f0;
+  padding: 0.2rem 0.8rem;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  color: #1e293b;
+}
+.table-wrapper {
+  overflow-x: auto;
+}
+.registre-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.registre-table th,
+.registre-table td {
+  padding: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+.registre-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #1e293b;
+}
+.action-icons {
+  display: flex;
+  gap: 0.5rem;
+}
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 0.1s;
+}
+.icon-btn:hover {
+  transform: scale(1.1);
+}
+.show-more-btn {
+  margin-top: 1rem;
+  background: none;
+  border: 1px solid #cbd5e1;
+  padding: 0.4rem 1rem;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+.show-more-btn:hover {
+  background: #f1f5f9;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .turnover-page {
+    margin-left: 0;
+    padding: 1rem;
+  }
+  .kpi-grid,
+  .two-columns {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

@@ -1,0 +1,95 @@
+/* Sidebar latérale fixe */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  z-index: 100;
+}
+
+/* En-tête HR / Smart HR Analytics */
+.sidebar-header {
+  padding: 30px 20px 20px 20px;
+  border-bottom: 1px solid #334155;
+  margin-bottom: 20px;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 1px;
+}
+
+.sidebar-header p {
+  margin: 5px 0 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* Chaque section (Main, Data, Account) */
+.sidebar-section {
+  margin-bottom: 25px;
+}
+
+.sidebar-section h3 {
+  padding: 0 20px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.sidebar-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-section li {
+  margin: 0;
+}
+
+.sidebar-section a,
+.sidebar-section .logout-btn {
+  display: block;
+  padding: 8px 20px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.sidebar-section a:hover,
+.sidebar-section .logout-btn:hover {
+  background-color: #334155;
+  color: white;
+  border-left-color: #667eea;
+}
+
+.sidebar-section a.active {
+  background-color: #334155;
+  color: white;
+  border-left-color: #667eea;
+  font-weight: 500;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 8px 20px;
+}

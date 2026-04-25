@@ -1,0 +1,225 @@
+/* Export File Page */
+.export-page {
+  margin-left: 260px;
+  padding: 2rem;
+  background: #f8fafc;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.page-header h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+.page-header p {
+  color: #475569;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+/* Deux colonnes */
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.8rem;
+  margin-bottom: 2rem;
+  align-items: stretch;
+}
+
+.left-col, .right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.8rem;
+}
+
+/* Cartes communes */
+.export-options, .customization-section, .ai-assistance, .history-section {
+  background: white;
+  border-radius: 24px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
+}
+.section-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+h2, h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+.option-row label {
+  width: 140px;
+  font-weight: 500;
+  color: #334155;
+}
+.option-row select, .option-row input {
+  flex: 1;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: white;
+}
+.department-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+.dept-checkbox {
+  background: #f1f5f9;
+  padding: 0.3rem 0.9rem;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.custom-date {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.format-buttons {
+  display: flex;
+  gap: 0.6rem;
+}
+.format-buttons button {
+  padding: 0.4rem 1rem;
+  border-radius: 30px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.format-buttons button.active {
+  background: #0f172a;
+  color: white;
+  border-color: #0f172a;
+}
+
+/* Assistance IA - encadrée et bien visible */
+.ai-assistance {
+  background: #fefce8;
+  border-left: 4px solid #eab308;
+}
+.ai-assistance ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #3b3b1f;
+}
+.ai-assistance li {
+  margin: 0.5rem 0;
+}
+
+/* Personnalisation des champs */
+.fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.fields-grid label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+}
+
+/* Boutons d'action */
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0;
+}
+.action-buttons button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 40px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.btn-primary {
+  background: #0f172a;
+  color: white;
+}
+.btn-primary:hover {
+  background: #1e293b;
+}
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+.btn-info {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Historique */
+.history-section {
+  margin-top: 1rem;
+}
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.history-table th, .history-table td {
+  padding: 0.8rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+.history-table th {
+  color: #475569;
+  font-weight: 500;
+}
+.status-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+.status-badge.success {
+  background: #dcfce7;
+  color: #15803d;
+}
+.status-badge.failed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.btn-download {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .export-page {
+    margin-left: 0;
+  }
+  .two-columns {
+    grid-template-columns: 1fr;
+  }
+}

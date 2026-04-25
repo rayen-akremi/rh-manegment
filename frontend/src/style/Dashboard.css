@@ -1,0 +1,194 @@
+/* Dashboard layout - contenu décalé vers la gauche */
+.dashboard-container {
+  margin-left: 270px;    /* réduit de 280px à 260px */
+  padding: 2rem 1rem 2rem 1rem;  /* padding gauche réduit */
+  background: #f8fafc;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.dashboard-header h1 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+.dashboard-header p {
+  color: #475569;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+/* KPI Cards - très compactes */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 16px;
+  padding: 0.75rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s;
+}
+.kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.kpi-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  margin-bottom: 0.2rem;
+}
+
+.kpi-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.2rem;
+}
+
+.kpi-trend {
+  font-size: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.kpi-trend.up {
+  color: #ef4444;
+}
+.kpi-trend.down {
+  color: #10b981;
+}
+
+/* Chart cards */
+.chart-card {
+  background: white;
+  border-radius: 24px;
+  padding: 1.5rem;
+  margin-bottom: 1.8rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.chart-card h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+}
+
+.chart-subtitle {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+/* Pie chart legend */
+.pie-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.legend-value {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Two columns layout */
+.two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.8rem;
+  margin-bottom: 1.8rem;
+}
+
+/* Ranking lists */
+.list-card {
+  background: white;
+  border-radius: 24px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+.list-card h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eef2ff;
+}
+.rank-number {
+  width: 28px;
+  height: 28px;
+  background: #f1f5f9;
+  border-radius: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.85rem;
+}
+.rank-info {
+  flex: 1;
+}
+.rank-name {
+  font-weight: 500;
+  color: #0f172a;
+}
+.rank-dept {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+.rank-value {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .dashboard-container {
+    margin-left: 0;
+    padding: 1rem;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.7rem;
+  }
+  .two-columns {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
