@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
@@ -8,10 +9,41 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// ========== IMPORT MODELS (required for mongoose to register them) ==========
+require('./models/Employe');
+require('./models/Absence');
+require('./models/Workload');
+require('./models/TurnoverHistory');
+require('./models/ImportHistory');
+require('./models/ExportHistory');
+
+// ========== IMPORT ROUTES ==========
+const employeRoutes = require('./routes/employeRoutes');
+const absenceRoutes = require('./routes/absenceRoutes');
+const workloadRoutes = require('./routes/workloadRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const importHistoryRoutes = require('./routes/importHistoryRoutes');
+const exportHistoryRoutes = require('./routes/exportHistoryRoutes');
+
+// ========== DATABASE CONNECTION ==========
+mongoose.connect('mongodb://127.0.0.1:27017/RH_management')
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB error:', err));
+
+// ========== ROUTES ==========
+app.use('/api/employees', employeRoutes);
+app.use('/api/absences', absenceRoutes);
+app.use('/api/workloads', workloadRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/import-history', importHistoryRoutes);
+app.use('/api/export-history', exportHistoryRoutes);
+
+// ========== TEST ROUTE ==========
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'Backend yekhdem mli7!' });
+  res.json({ message: 'Backend is working!' });
 });
 
+// ========== START SERVER ==========
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -23,7 +23,7 @@ const Login: React.FC = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="logo">
-          <h1>OFICAB</h1>
+          <h1>COFICAB</h1>
           <p>Powered by Passion</p>
         </div>
         <h2>Connexion</h2>

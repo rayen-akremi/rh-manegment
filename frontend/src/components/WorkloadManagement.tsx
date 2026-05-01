@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
@@ -17,133 +17,177 @@ interface EmployeeWorkload {
   status: WorkloadStatus;
 }
 
-interface DepartmentWorkload {
-  department: string;
-  avgWeeklyHours: number;
-}
-
-interface OvertimeTrend {
-  month: string;
-  overtime: number;
-}
-
-// Données initiales des employés
-const initialEmployees: EmployeeWorkload[] = [
-  { id: '1', name: 'Sophia Rossi', department: 'Engineering', weeklyHours: 42, overtimeHours: 5, status: 'Normal' },
-  { id: '2', name: 'Lucas Bernard', department: 'Sales', weeklyHours: 48, overtimeHours: 12, status: 'High' },
-  { id: '3', name: 'Emma Wilson', department: 'Marketing', weeklyHours: 38, overtimeHours: 2, status: 'Normal' },
-  { id: '4', name: 'John Doe', department: 'Finance', weeklyHours: 52, overtimeHours: 18, status: 'Critical' },
-  { id: '5', name: 'Maya Robinson', department: 'Engineering', weeklyHours: 45, overtimeHours: 8, status: 'High' },
-  { id: '6', name: 'Ali Ben Salah', department: 'Product', weeklyHours: 36, overtimeHours: 1, status: 'Normal' },
-  { id: '7', name: 'Clara Dupont', department: 'Support', weeklyHours: 50, overtimeHours: 15, status: 'Critical' },
-  { id: '8', name: 'David Mercier', department: 'Sales', weeklyHours: 44, overtimeHours: 9, status: 'High' },
-];
-
-// Données pour le bar chart (moyenne par département)
-const departmentData: DepartmentWorkload[] = [
-  { department: 'Engineering', avgWeeklyHours: 43.5 },
-  { department: 'Sales', avgWeeklyHours: 46 },
-  { department: 'Marketing', avgWeeklyHours: 38 },
-  { department: 'Finance', avgWeeklyHours: 52 },
-  { department: 'Product', avgWeeklyHours: 36 },
-  { department: 'Support', avgWeeklyHours: 50 },
-];
-
-// Données pour le line chart (tendance overtime)
-const overtimeTrends: OvertimeTrend[] = [
-  { month: 'Jan', overtime: 42 }, { month: 'Fév', overtime: 38 },
-  { month: 'Mar', overtime: 45 }, { month: 'Avr', overtime: 52 },
-  { month: 'Mai', overtime: 58 }, { month: 'Juin', overtime: 63 },
-  { month: 'Juil', overtime: 70 }, { month: 'Aoû', overtime: 68 },
-  { month: 'Sep', overtime: 72 },
-];
-
-// Données pour la heatmap (départements avec niveau de risque et heures)
-const heatmapData = [
-  { department: 'Engineering', workload: 43, risk: 'medium' },
-  { department: 'Sales', workload: 48, risk: 'high' },
-  { department: 'Marketing', workload: 38, risk: 'low' },
-  { department: 'Finance', workload: 52, risk: 'critical' },
-  { department: 'Product', workload: 36, risk: 'low' },
-  { department: 'Support', workload: 50, risk: 'high' },
-];
-
-const getStatusColor = (status: WorkloadStatus): string => {
-  switch (status) {
-    case 'Normal': return '#10b981';
-    case 'High': return '#f59e0b';
-    case 'Critical': return '#ef4444';
-    default: return '#6b7280';
-  }
-};
-
 const WorkloadManagement: React.FC = () => {
-  const [employees, setEmployees] = useState<EmployeeWorkload[]>(initialEmployees);
+  const [workloads, setWorkloads] = useState<EmployeeWorkload[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All departments');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<EmployeeWorkload | null>(null);
-  const [newEmployee, setNewEmployee] = useState({
-    name: '', department: '', weeklyHours: 40, overtimeHours: 0, status: 'Normal' as WorkloadStatus
+  const [editingWorkload, setEditingWorkload] = useState<EmployeeWorkload | null>(null);
+  const [newWorkload, setNewWorkload] = useState({
+    employeeId: '',
+    name: '',
+    department: '',
+    weeklyHours: 40,
+    overtimeHours: 0,
+    status: 'Normal' as WorkloadStatus
   });
   const [editForm, setEditForm] = useState({
-    name: '', department: '', weeklyHours: 40, overtimeHours: 0, status: 'Normal' as WorkloadStatus
+    employeeId: '',
+    name: '',
+    department: '',
+    weeklyHours: 40,
+    overtimeHours: 0,
+    status: 'Normal' as WorkloadStatus
   });
 
-  // KPI
-  const avgWeeklyHours = employees.reduce((sum, e) => sum + e.weeklyHours, 0) / employees.length;
-  const totalOvertime = employees.reduce((sum, e) => sum + e.overtimeHours, 0);
-  const burnoutRisk = employees.filter(e => e.status === 'High' || e.status === 'Critical').length;
-
-  const departments = ['All departments', ...new Set(employees.map(e => e.department))];
-
-  const filteredEmployees = employees.filter(emp => {
-    const matchSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        emp.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchDept = departmentFilter === 'All departments' || emp.department === departmentFilter;
-    return matchSearch && matchDept;
-  });
-
-  const handleAdd = () => {
-    const newId = (Math.max(...employees.map(e => parseInt(e.id)), 0) + 1).toString();
-    const newEmp: EmployeeWorkload = { id: newId, ...newEmployee };
-    setEmployees([...employees, newEmp]);
-    setShowAddModal(false);
-    setNewEmployee({ name: '', department: '', weeklyHours: 40, overtimeHours: 0, status: 'Normal' });
+  // ========== FETCH WORKLOADS FROM BACKEND ==========
+  const fetchWorkloads = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/workloads');
+      if (!response.ok) throw new Error('Erreur chargement');
+      const data = await response.json();
+      
+      const formattedWorkloads: EmployeeWorkload[] = (data || []).map((item: any) => ({
+        id: item.workload_id || item._id,
+        name: item.name || '',
+        department: item.department || '',
+        weeklyHours: item.weeklyHours || 0,
+        overtimeHours: item.overtimeHours || 0,
+        status: item.status || 'Normal'
+      }));
+      
+      setWorkloads(formattedWorkloads);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching workloads:', err);
+      setError('Impossible de charger les charges de travail');
+      setWorkloads([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEditClick = (emp: EmployeeWorkload) => {
-    setEditingEmployee(emp);
+  useEffect(() => {
+    fetchWorkloads();
+  }, []);
+
+  // ========== ADD WORKLOAD ==========
+  const handleAdd = async () => {
+    if (!newWorkload.employeeId.trim()) { alert("L'ID employé est requis"); return; }
+    if (!newWorkload.name.trim()) { alert("Le nom est requis"); return; }
+    if (!newWorkload.department.trim()) { alert("Le département est requis"); return; }
+    if (newWorkload.weeklyHours < 0) { alert("Les heures hebdomadaires doivent être >= 0"); return; }
+    if (newWorkload.overtimeHours < 0) { alert("Les heures supplémentaires doivent être >= 0"); return; }
+
+    const payload = {
+      workload_id: `WL${Date.now()}`,
+      employee_id: newWorkload.employeeId,
+      name: newWorkload.name,
+      department: newWorkload.department,
+      weeklyHours: newWorkload.weeklyHours,
+      overtimeHours: newWorkload.overtimeHours,
+      status: newWorkload.status
+    };
+
+    try {
+      const response = await fetch('/api/workloads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Erreur ajout');
+      }
+      
+      await fetchWorkloads();
+      setShowAddModal(false);
+      setNewWorkload({
+        employeeId: '',
+        name: '',
+        department: '',
+        weeklyHours: 40,
+        overtimeHours: 0,
+        status: 'Normal'
+      });
+    } catch (err: any) {
+      alert(`Erreur lors de l'ajout: ${err.message}`);
+    }
+  };
+
+  // ========== EDIT WORKLOAD ==========
+  const handleEditClick = (workload: EmployeeWorkload) => {
+    setEditingWorkload(workload);
     setEditForm({
-      name: emp.name,
-      department: emp.department,
-      weeklyHours: emp.weeklyHours,
-      overtimeHours: emp.overtimeHours,
-      status: emp.status,
+      employeeId: '',
+      name: workload.name,
+      department: workload.department,
+      weeklyHours: workload.weeklyHours,
+      overtimeHours: workload.overtimeHours,
+      status: workload.status,
     });
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = () => {
-    if (!editingEmployee) return;
-    const updated: EmployeeWorkload = { ...editingEmployee, ...editForm };
-    setEmployees(employees.map(e => e.id === editingEmployee.id ? updated : e));
-    setShowEditModal(false);
-    setEditingEmployee(null);
-  };
+  const handleSaveEdit = async () => {
+    if (!editingWorkload) return;
+    
+    const payload = {
+      name: editForm.name,
+      department: editForm.department,
+      weeklyHours: editForm.weeklyHours,
+      overtimeHours: editForm.overtimeHours,
+      status: editForm.status,
+    };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Delete this workload record?')) {
-      setEmployees(employees.filter(e => e.id !== id));
+    try {
+      const response = await fetch(`/api/workloads/${editingWorkload.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Erreur modification');
+      await fetchWorkloads();
+      setShowEditModal(false);
+      setEditingWorkload(null);
+    } catch (err) {
+      alert('Erreur lors de la modification');
     }
   };
 
+  // ========== DELETE WORKLOAD ==========
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Supprimer cet enregistrement ?')) return;
+    try {
+      const response = await fetch(`/api/workloads/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur suppression');
+      await fetchWorkloads();
+    } catch (err) {
+      alert('Erreur lors de la suppression');
+    }
+  };
+
+  // ========== EXPORT CSV ==========
   const handleExport = () => {
+    if (workloads.length === 0) {
+      alert('Aucune donnée à exporter');
+      return;
+    }
     const headers = ['Name', 'Department', 'Weekly Hours', 'Overtime Hours', 'Status'];
-    const rows = filteredEmployees.map(e => [e.name, e.department, e.weeklyHours, e.overtimeHours, e.status]);
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const rows = workloads.map(w => [
+      w.name || '',
+      w.department || '',
+      w.weeklyHours || 0,
+      w.overtimeHours || 0,
+      w.status || ''
+    ]);
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -151,6 +195,69 @@ const WorkloadManagement: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // ========== CALCULATIONS ==========
+  const avgWeeklyHours = workloads.length > 0 
+    ? workloads.reduce((sum, w) => sum + w.weeklyHours, 0) / workloads.length 
+    : 0;
+  const totalOvertime = workloads.reduce((sum, w) => sum + w.overtimeHours, 0);
+  const burnoutRisk = workloads.filter(w => w.status === 'High' || w.status === 'Critical').length;
+  const exceedingThreshold = workloads.filter(w => w.overtimeHours > 45).length;
+
+  const departmentData = workloads.reduce((acc: any[], curr) => {
+    const existing = acc.find(d => d.department === curr.department);
+    if (existing) {
+      existing.avgWeeklyHours = (existing.avgWeeklyHours + curr.weeklyHours) / 2;
+    } else {
+      acc.push({ department: curr.department, avgWeeklyHours: curr.weeklyHours });
+    }
+    return acc;
+  }, []);
+
+  const overtimeTrends = [
+    { month: 'Jan', overtime: 42 }, { month: 'Fév', overtime: 38 },
+    { month: 'Mar', overtime: 45 }, { month: 'Avr', overtime: 52 },
+    { month: 'Mai', overtime: 58 }, { month: 'Juin', overtime: 63 },
+    { month: 'Juil', overtime: 70 }, { month: 'Aoû', overtime: 68 },
+    { month: 'Sep', overtime: 72 },
+  ];
+
+  const heatmapData = workloads.reduce((acc: any[], curr) => {
+    const existing = acc.find(h => h.department === curr.department);
+    if (existing) {
+      existing.workload = (existing.workload + curr.weeklyHours) / 2;
+    } else {
+      let risk = 'low';
+      if (curr.weeklyHours >= 50) risk = 'critical';
+      else if (curr.weeklyHours >= 45) risk = 'high';
+      else if (curr.weeklyHours >= 40) risk = 'medium';
+      acc.push({ department: curr.department, workload: curr.weeklyHours, risk });
+    }
+    return acc;
+  }, []);
+
+  const departments = ['All departments', ...new Set(workloads.map(w => w.department).filter(Boolean))];
+  
+  const filteredWorkloads = workloads.filter(w => {
+    if (!w) return false;
+    const searchLower = (searchTerm || '').toLowerCase();
+    const matchSearch = (w.name || '').toLowerCase().includes(searchLower) ||
+                        (w.department || '').toLowerCase().includes(searchLower);
+    const matchDept = departmentFilter === 'All departments' || w.department === departmentFilter;
+    return matchSearch && matchDept;
+  });
+
+  const getStatusColor = (status: WorkloadStatus): string => {
+    switch (status) {
+      case 'Normal': return '#10b981';
+      case 'High': return '#f59e0b';
+      case 'Critical': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  if (loading) return <div style={{ marginLeft: '260px', padding: '2rem' }}>Chargement des charges de travail...</div>;
+  if (error) return <div style={{ color: 'red', marginLeft: '260px', padding: '2rem' }}>{error}</div>;
 
   return (
     <div>
@@ -173,7 +280,7 @@ const WorkloadManagement: React.FC = () => {
           </div>
           <div className="kpi-card">
             <div className="kpi-title">Exceeding threshold (45h)</div>
-            <div className="kpi-value">{employees.filter(e => e.overtimeHours > 45).length}</div>
+            <div className="kpi-value">{exceedingThreshold}</div>
             <div className="kpi-sub">employees</div>
           </div>
           <div className="kpi-card">
@@ -183,13 +290,13 @@ const WorkloadManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Toolbar buttons */}
+        {/* Toolbar */}
         <div className="toolbar">
           <button className="btn-add" onClick={() => setShowAddModal(true)}>➕ Add workload</button>
           <button className="btn-export" onClick={handleExport}>📤 Export report</button>
         </div>
 
-        {/* Workload Table */}
+        {/* Table */}
         <div className="table-section">
           <div className="table-header">
             <h2>Workload Overview</h2>
@@ -204,20 +311,39 @@ const WorkloadManagement: React.FC = () => {
             <table className="workload-table">
               <thead>
                 <tr>
-                  <th>Name</th><th>Department</th><th>Weekly hours</th><th>Overtime hours</th><th>Status</th><th>Actions</th>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Weekly hours</th>
+                  <th>Overtime hours</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredEmployees.map(emp => (
-                  <tr key={emp.id}>
-                    <td>{emp.name}</td><td>{emp.department}</td><td>{emp.weeklyHours}</td><td>{emp.overtimeHours}</td>
-                    <td><span className="status-badge" style={{backgroundColor: getStatusColor(emp.status), color: 'white'}}>{emp.status}</span></td>
+                {filteredWorkloads.map(work => (
+                  <tr key={work.id}>
+                    <td>{work.name}</td>
+                    <td>{work.department}</td>
+                    <td>{work.weeklyHours}</td>
+                    <td>{work.overtimeHours}</td>
+                    <td>
+                      <span className="status-badge" style={{backgroundColor: getStatusColor(work.status), color: 'white'}}>
+                        {work.status}
+                      </span>
+                    </td>
                     <td className="actions">
-                      <button className="edit-btn" onClick={() => handleEditClick(emp)}>✏️</button>
-                      <button className="delete-btn" onClick={() => handleDelete(emp.id)}>🗑️</button>
+                      <button className="edit-btn" onClick={() => handleEditClick(work)}>✏️</button>
+                      <button className="delete-btn" onClick={() => handleDelete(work.id)}>🗑️</button>
                     </td>
                   </tr>
                 ))}
+                {filteredWorkloads.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
+                      Aucune charge de travail trouvée.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -253,7 +379,7 @@ const WorkloadManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Heatmap - tous les départements sur une ligne, même taille */}
+        {/* Heatmap */}
         <div className="heatmap-section">
           <h3>🔥 Heatmap: Teams with excessive workload</h3>
           <div className="heatmap-grid">
@@ -269,7 +395,7 @@ const WorkloadManagement: React.FC = () => {
         <div className="ai-insights">
           <h3>🤖 AI Insights</h3>
           <ul>
-            <li>🔴 <strong>At-risk employees:</strong> {employees.filter(e => e.status === 'Critical' || e.overtimeHours > 15).map(e => e.name).join(', ') || 'None'}</li>
+            <li>🔴 <strong>At-risk employees:</strong> {workloads.filter(w => w.status === 'Critical' || w.overtimeHours > 15).map(w => w.name).join(', ') || 'None'}</li>
             <li>⚠️ <strong>Workload redistribution</strong> needed for Sales and Finance departments.</li>
             <li>📅 <strong>Flexible scheduling</strong> recommended for teams exceeding 48h/week.</li>
           </ul>
@@ -281,35 +407,128 @@ const WorkloadManagement: React.FC = () => {
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Add workload record</h2>
-            <div className="form-row"><input placeholder="Name" value={newEmployee.name} onChange={e => setNewEmployee({...newEmployee, name: e.target.value})} /></div>
-            <div className="form-row"><input placeholder="Department" value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})} /></div>
-            <div className="form-row"><label>Weekly hours</label><input type="number" value={newEmployee.weeklyHours} onChange={e => setNewEmployee({...newEmployee, weeklyHours: Number(e.target.value)})} /></div>
-            <div className="form-row"><label>Overtime hours</label><input type="number" value={newEmployee.overtimeHours} onChange={e => setNewEmployee({...newEmployee, overtimeHours: Number(e.target.value)})} /></div>
-            <div className="form-row"><label>Status</label>
-              <select value={newEmployee.status} onChange={e => setNewEmployee({...newEmployee, status: e.target.value as WorkloadStatus})}>
-                <option>Normal</option><option>High</option><option>Critical</option>
-              </select>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Employee ID</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g., EMP001" 
+                  value={newWorkload.employeeId} 
+                  onChange={e => setNewWorkload({...newWorkload, employeeId: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Name</label>
+                <input 
+                  placeholder="Name" 
+                  value={newWorkload.name} 
+                  onChange={e => setNewWorkload({...newWorkload, name: e.target.value})} 
+                />
+              </div>
             </div>
-            <div className="modal-actions"><button onClick={() => setShowAddModal(false)}>Cancel</button><button onClick={handleAdd}>Add</button></div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Department</label>
+                <input 
+                  placeholder="Department" 
+                  value={newWorkload.department} 
+                  onChange={e => setNewWorkload({...newWorkload, department: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Weekly hours</label>
+                <input 
+                  type="number" 
+                  value={newWorkload.weeklyHours} 
+                  onChange={e => setNewWorkload({...newWorkload, weeklyHours: Number(e.target.value)})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Overtime hours</label>
+                <input 
+                  type="number" 
+                  value={newWorkload.overtimeHours} 
+                  onChange={e => setNewWorkload({...newWorkload, overtimeHours: Number(e.target.value)})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select 
+                  value={newWorkload.status} 
+                  onChange={e => setNewWorkload({...newWorkload, status: e.target.value as WorkloadStatus})}
+                >
+                  <option>Normal</option>
+                  <option>High</option>
+                  <option>Critical</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button className="btn-submit" onClick={handleAdd}>Add</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Edit Modal */}
-      {showEditModal && editingEmployee && (
+      {showEditModal && editingWorkload && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Edit workload</h2>
-            <div className="form-row"><input placeholder="Name" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} /></div>
-            <div className="form-row"><input placeholder="Department" value={editForm.department} onChange={e => setEditForm({...editForm, department: e.target.value})} /></div>
-            <div className="form-row"><label>Weekly hours</label><input type="number" value={editForm.weeklyHours} onChange={e => setEditForm({...editForm, weeklyHours: Number(e.target.value)})} /></div>
-            <div className="form-row"><label>Overtime hours</label><input type="number" value={editForm.overtimeHours} onChange={e => setEditForm({...editForm, overtimeHours: Number(e.target.value)})} /></div>
-            <div className="form-row"><label>Status</label>
-              <select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value as WorkloadStatus})}>
-                <option>Normal</option><option>High</option><option>Critical</option>
-              </select>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Name</label>
+                <input 
+                  value={editForm.name} 
+                  onChange={e => setEditForm({...editForm, name: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Department</label>
+                <input 
+                  value={editForm.department} 
+                  onChange={e => setEditForm({...editForm, department: e.target.value})} 
+                />
+              </div>
             </div>
-            <div className="modal-actions"><button onClick={() => setShowEditModal(false)}>Cancel</button><button onClick={handleSaveEdit}>Save</button></div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Weekly hours</label>
+                <input 
+                  type="number" 
+                  value={editForm.weeklyHours} 
+                  onChange={e => setEditForm({...editForm, weeklyHours: Number(e.target.value)})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Overtime hours</label>
+                <input 
+                  type="number" 
+                  value={editForm.overtimeHours} 
+                  onChange={e => setEditForm({...editForm, overtimeHours: Number(e.target.value)})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Status</label>
+                <select 
+                  value={editForm.status} 
+                  onChange={e => setEditForm({...editForm, status: e.target.value as WorkloadStatus})}
+                >
+                  <option>Normal</option>
+                  <option>High</option>
+                  <option>Critical</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
+              <button className="btn-submit" onClick={handleSaveEdit}>Save</button>
+            </div>
           </div>
         </div>
       )}

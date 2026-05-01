@@ -308,7 +308,6 @@ const ImportFile: React.FC = () => {
 
         <div className="action-buttons">
           <button className="btn-primary" onClick={startImport} disabled={!file}>📤 Start Import</button>
-          <button className="btn-secondary" onClick={saveMappingTemplate}>✏️ Edit Mapping</button>
           <button className="btn-danger" onClick={cancelImport}>🗑️ Cancel Import</button>
           <button className="btn-info" onClick={() => setShowHistory(!showHistory)}>📑 View Import History</button>
         </div>

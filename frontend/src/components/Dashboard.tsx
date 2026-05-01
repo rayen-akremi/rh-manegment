@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -6,51 +6,103 @@ import {
 import Navbar from './Navbar';
 import '../style/Dashboard.css';
 
-// Données KPI
-const kpiData = {
-  absenceRate: 5.4,
-  turnoverRate: 1.9,
-  totalEmployees: 1248,
-  overtimeHours: 3412,
-};
+// Types pour les données
+interface KpiData {
+  absenceRate: number;
+  turnoverRate: number;
+  totalEmployees: number;
+  overtimeHours: number;
+}
 
-// Évolution mensuelle sur 6 MOIS (juillet à décembre)
-const monthlyData6 = [
-  { month: 'Juil', absence: 5.3, turnover: 1.9 },
-  { month: 'Août', absence: 5.5, turnover: 2.1 },
-  { month: 'Sep', absence: 5.4, turnover: 2.0 },
-  { month: 'Oct', absence: 5.6, turnover: 2.2 },
-  { month: 'Nov', absence: 5.5, turnover: 2.1 },
-  { month: 'Déc', absence: 5.4, turnover: 1.9 },
-];
+interface MonthlyData {
+  month: string;
+  absence: number;
+  turnover: number;
+}
 
-// Répartition des absences par motif (camembert)
-const absenceReasons = [
-  { name: 'Maladie', value: 48, color: '#ef4444' },
-  { name: 'Congés payés', value: 32, color: '#3b82f6' },
-  { name: 'Non justifiée', value: 12, color: '#f59e0b' },
-  { name: 'Familial', value: 8, color: '#10b981' },
-];
+interface ReasonData {
+  name: string;
+  value: number;
+  color: string;
+}
 
-// Top absences
-const topAbsences = [
-  { name: 'Maya Robinson', department: 'Engineering', days: 14 },
-  { name: 'Lucas Bernard', department: 'Sales', days: 12 },
-  { name: 'Hana Tanaka', department: 'Support', days: 11 },
-  { name: 'Diego Alvarez', department: 'Marketing', days: 10 },
-  { name: 'Priya Shah', department: 'Finance', days: 9 },
-];
-
-// Top overtime
-const topOvertime = [
-  { name: 'Noah Williams', department: 'Engineering', hours: 64 },
-  { name: 'Aïcha Diallo', department: 'Operations', hours: 58 },
-  { name: 'Jonas Becker', department: 'Engineering', hours: 52 },
-  { name: 'Sara Lindqvist', department: 'Product', hours: 49 },
-  { name: 'Omar Haddad', department: 'IT', hours: 47 },
-];
+interface TopEmployee {
+  name: string;
+  department: string;
+  days?: number;
+  hours?: number;
+}
 
 const Dashboard: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [kpi, setKpi] = useState<KpiData>({
+    absenceRate: 0,
+    turnoverRate: 0,
+    totalEmployees: 0,
+    overtimeHours: 0,
+  });
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [absenceReasons, setAbsenceReasons] = useState<ReasonData[]>([]);
+  const [topAbsences, setTopAbsences] = useState<TopEmployee[]>([]);
+  const [topOvertime, setTopOvertime] = useState<TopEmployee[]>([]);
+
+  // Fonction pour récupérer toutes les données
+  const fetchDashboardData = async () => {
+    try {
+      // Remplacer les URLs par vos endpoints réels
+      const [kpiRes, monthlyRes, reasonsRes, topAbsRes, topOvertimeRes] = await Promise.all([
+        fetch('/api/dashboard/kpi'),
+        fetch('/api/dashboard/monthly'),
+        fetch('/api/dashboard/absence-reasons'),
+        fetch('/api/dashboard/top-absences'),
+        fetch('/api/dashboard/top-overtime'),
+      ]);
+
+      if (!kpiRes.ok || !monthlyRes.ok || !reasonsRes.ok || !topAbsRes.ok || !topOvertimeRes.ok) {
+        throw new Error('Erreur lors du chargement des données');
+      }
+
+      const kpiData = await kpiRes.json();
+      const monthlyData = await monthlyRes.json();
+      const reasonsData = await reasonsRes.json();
+      const topAbsencesData = await topAbsRes.json();
+      const topOvertimeData = await topOvertimeRes.json();
+
+      setKpi(kpiData);
+      setMonthlyData(monthlyData);
+      setAbsenceReasons(reasonsData);
+      setTopAbsences(topAbsencesData);
+      setTopOvertime(topOvertimeData);
+    } catch (error) {
+      console.error('Erreur chargement dashboard:', error);
+      // Option : afficher un message d'erreur à l'utilisateur
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <Navbar />
+        <div className="dashboard-container">
+          <div className="loading-spinner">Chargement des données...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Définir des couleurs par défaut pour le camembert si non fournies
+  const defaultColors = ['#ef4444', '#3b82f6', '#f59e0b', '#10b981'];
+  const pieData = absenceReasons.map((item, idx) => ({
+    ...item,
+    color: item.color || defaultColors[idx % defaultColors.length]
+  }));
+
   return (
     <div>
       <Navbar />
@@ -64,33 +116,33 @@ const Dashboard: React.FC = () => {
         <div className="kpi-grid">
           <div className="kpi-card">
             <div className="kpi-title">TAUX D'ABSENCE</div>
-            <div className="kpi-value">{kpiData.absenceRate} %</div>
+            <div className="kpi-value">{kpi.absenceRate} %</div>
             <div className="kpi-trend up">↗ +0,6 pt vs mois dernier</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-title">TAUX DE TURNOVER</div>
-            <div className="kpi-value">{kpiData.turnoverRate} %</div>
+            <div className="kpi-value">{kpi.turnoverRate} %</div>
             <div className="kpi-trend down">↘ -0,3 pt vs mois dernier</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-title">EMPLOYÉS TOTAUX</div>
-            <div className="kpi-value">{kpiData.totalEmployees.toLocaleString()}</div>
+            <div className="kpi-value">{kpi.totalEmployees.toLocaleString()}</div>
             <div className="kpi-trend up">↗ +24 vs mois dernier</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-title">HEURES SUPPLÉMENTAIRES</div>
-            <div className="kpi-value">{kpiData.overtimeHours.toLocaleString()} h</div>
+            <div className="kpi-value">{kpi.overtimeHours.toLocaleString()} h</div>
             <div className="kpi-trend up">↗ +8,2 % vs mois dernier</div>
           </div>
         </div>
 
-        {/* Première ligne : Évolution mensuelle (6 mois) + Répartition des absences côte à côte */}
+        {/* Première ligne : Évolution mensuelle + Répartition des absences */}
         <div className="two-columns">
           <div className="chart-card">
             <h2>Évolution mensuelle</h2>
             <p className="chart-subtitle">Taux d'absence et de turnover sur 6 mois</p>
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={monthlyData6} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
+              <LineChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis domain={[0, 8]} tickFormatter={(value) => `${value}%`} />
@@ -108,7 +160,7 @@ const Dashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
                 <Pie
-                  data={absenceReasons}
+                  data={pieData}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -118,7 +170,7 @@ const Dashboard: React.FC = () => {
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
                 >
-                  {absenceReasons.map((entry, index) => (
+                  {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -126,7 +178,7 @@ const Dashboard: React.FC = () => {
               </PieChart>
             </ResponsiveContainer>
             <div className="pie-legend">
-              {absenceReasons.map(item => (
+              {pieData.map(item => (
                 <div key={item.name} className="legend-item">
                   <span className="legend-color" style={{ backgroundColor: item.color }}></span>
                   <span>{item.name}</span>

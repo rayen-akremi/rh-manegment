@@ -1,0 +1,125 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.0 Chrome/140.0.7339.249 Electron/38.7.2 Safari/537.36">
+  <diagram name="Page-1" id="_4F-aL0nl7p9iumdMP07">
+    <mxGraphModel dx="905" dy="601" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <object label="" id="0">
+          <mxCell />
+        </object>
+        <mxCell id="1" parent="0" />
+        <object label="rh agent&#xa;" sdfrd="dfgdf" id="LWEDWkCzi_BxKumppZmn-1">
+          <mxCell parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;outlineConnect=0;autosizeText=1;fontSize=8;convertToSvg=0;fontStyle=0;" vertex="1">
+            <mxGeometry height="60" width="40" x="61" y="309" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="620" width="400" x="188" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-4" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="s&#39;authentifier" vertex="1">
+          <mxGeometry height="40" width="100" x="220" y="319" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-11" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Consulter le tableau de bord" vertex="1">
+          <mxGeometry height="40" width="180" x="368" y="74" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-12" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Gérer les employés" vertex="1">
+          <mxGeometry height="40" width="160" x="377" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-13" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Consulter les prédictions IA" vertex="1">
+          <mxGeometry height="40" width="180" x="369" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-14" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Gérer les absences" vertex="1">
+          <mxGeometry height="40" width="150" x="395" y="235" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-15" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Workload" vertex="1">
+          <mxGeometry height="40" width="150" x="398" y="289" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-16" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Gérer le turnover" vertex="1">
+          <mxGeometry height="40" width="150" x="401" y="345" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-17" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Importer des fichiers" vertex="1">
+          <mxGeometry height="40" width="150" x="400" y="399" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-18" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Exporter des rapports" vertex="1">
+          <mxGeometry height="40" width="150" x="402" y="452" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-19" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Gérer les paramètres" vertex="1">
+          <mxGeometry height="40" width="150" x="399" y="508" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-20" parent="1" style="ellipse;whiteSpace=wrap;html=1;align=center;newEdgeStyle={&quot;edgeStyle&quot;:&quot;entityRelationEdgeStyle&quot;,&quot;startArrow&quot;:&quot;none&quot;,&quot;endArrow&quot;:&quot;none&quot;,&quot;segment&quot;:10,&quot;curved&quot;:1,&quot;sourcePerimeterSpacing&quot;:0,&quot;targetPerimeterSpacing&quot;:0};treeFolding=1;treeMoving=1;" value="Se déconnecter" vertex="1">
+          <mxGeometry height="40" width="150" x="397" y="567.5" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-26" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LWEDWkCzi_BxKumppZmn-4" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="100" y="339" as="sourcePoint" />
+            <mxPoint x="180" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-27" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" vertex="1">
+          <mxGeometry height="30" width="60" x="126" y="314" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-28" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LWEDWkCzi_BxKumppZmn-11" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="327" y="200" as="sourcePoint" />
+            <mxPoint x="377" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-29" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-12" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="300" y="325" as="sourcePoint" />
+            <mxPoint x="350" y="275" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-31" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-14" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="310" y="325" as="sourcePoint" />
+            <mxPoint x="360" y="275" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-32" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-15" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="327" y="339" as="sourcePoint" />
+            <mxPoint x="377" y="289" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-33" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-20" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="327" y="444" as="sourcePoint" />
+            <mxPoint x="377" y="394" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-34" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LWEDWkCzi_BxKumppZmn-19" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="320" y="340" as="sourcePoint" />
+            <mxPoint x="407" y="598" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-35" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-18" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="330" y="329" as="sourcePoint" />
+            <mxPoint x="409" y="517" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-36" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LWEDWkCzi_BxKumppZmn-17" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="440" y="440" as="sourcePoint" />
+            <mxPoint x="490" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-37" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="LWEDWkCzi_BxKumppZmn-16" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="440" y="440" as="sourcePoint" />
+            <mxPoint x="490" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-38" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontSize=15;fontStyle=1" value="Diagramme de cas d&#39;utilisation generale" vertex="1">
+          <mxGeometry height="30" width="290" x="254" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="LWEDWkCzi_BxKumppZmn-39" edge="1" parent="1" source="LWEDWkCzi_BxKumppZmn-4" style="endArrow=none;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="LWEDWkCzi_BxKumppZmn-13" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="330" y="349" as="sourcePoint" />
+            <mxPoint x="405" y="265" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -5,10 +5,11 @@ import {
 import Navbar from './Navbar';
 import '../style/AbsenceManagement.css';
 
-type AbsenceType = 'Sick leave' | 'Vacation' | 'Maternity' | 'Other';
+type AbsenceType = 'Sick leave' | 'Vacation' | 'Maternity' | 'non justifer';
 
 interface AbsenceRecord {
   id: string;
+  employeeId: string;
   employee: string;
   department: string;
   type: AbsenceType;
@@ -16,35 +17,10 @@ interface AbsenceRecord {
   startDate: string;
 }
 
-// Données du graphique
-const departmentAbsences = [
-  { department: 'Engineering', absences: 13 },
-  { department: 'Sales', absences: 18 },
-  { department: 'Support', absences: 11 },
-  { department: 'Marketing', absences: 9 },
-  { department: 'Finance', absences: 8 },
-  { department: 'Operations', absences: 7 },
-  { department: 'Product', absences: 2 },
-];
-
-// Données statiques initiales
-const initialAbsences: AbsenceRecord[] = [
-  { id: '1', employee: 'Maya Robinson', department: 'Engineering', type: 'Sick leave', days: 4, startDate: '2025-09-02' },
-  { id: '2', employee: 'Lucas Bernard', department: 'Sales', type: 'Vacation', days: 8, startDate: '2025-08-15' },
-  { id: '3', employee: 'Lucas Bernard', department: 'Sales', type: 'Sick leave', days: 4, startDate: '2025-09-20' },
-  { id: '4', employee: 'Sophie Martin', department: 'Marketing', type: 'Vacation', days: 5, startDate: '2025-10-01' },
-  { id: '5', employee: 'John Doe', department: 'Finance', type: 'Sick leave', days: 2, startDate: '2025-09-28' },
-  { id: '6', employee: 'Emma Wilson', department: 'Operations', type: 'Maternity', days: 90, startDate: '2025-07-15' },
-  { id: '7', employee: 'Ali Ben Salah', department: 'Product', type: 'Vacation', days: 10, startDate: '2025-09-10' },
-  { id: '8', employee: 'Clara Dupont', department: 'Support', type: 'Sick leave', days: 3, startDate: '2025-09-22' },
-];
-
 const AbsenceManagement: React.FC = () => {
-  // Chargement des absences depuis localStorage (importées) + initiales
-  const storedAbsences = localStorage.getItem('importedAbsences');
-  const importedAbsences: AbsenceRecord[] = storedAbsences ? JSON.parse(storedAbsences) : [];
-  const [absences, setAbsences] = useState<AbsenceRecord[]>([...initialAbsences, ...importedAbsences]);
-
+  const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All departments');
   const [typeFilter, setTypeFilter] = useState('All types');
@@ -52,6 +28,7 @@ const AbsenceManagement: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AbsenceRecord | null>(null);
   const [newAbsence, setNewAbsence] = useState({
+    employeeId: '',
     employee: '',
     department: '',
     type: 'Sick leave' as AbsenceType,
@@ -59,6 +36,7 @@ const AbsenceManagement: React.FC = () => {
     startDate: '',
   });
   const [editForm, setEditForm] = useState({
+    employeeId: '',
     employee: '',
     department: '',
     type: 'Sick leave' as AbsenceType,
@@ -66,85 +44,139 @@ const AbsenceManagement: React.FC = () => {
     startDate: '',
   });
 
-  // Écoute les imports (storage event) et met à jour l'état
-  useEffect(() => {
-    const handleStorage = () => {
-      const updated = localStorage.getItem('importedAbsences');
-      if (updated) {
-        const newImported = JSON.parse(updated);
-        setAbsences([...initialAbsences, ...newImported]);
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  const overallAbsenceRate = 0.3;
-  const totalAbsenceDays = 70;
-  const employeesMoreThan3Absences = 8;
-
-  const departments = ['All departments', ...new Set(absences.map(a => a.department))];
-  const types = ['All types', ...new Set(absences.map(a => a.type))];
-
-  const filteredAbsences = absences.filter(rec => {
-    const matchSearch = rec.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        rec.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchDept = departmentFilter === 'All departments' || rec.department === departmentFilter;
-    const matchType = typeFilter === 'All types' || rec.type === typeFilter;
-    return matchSearch && matchDept && matchType;
-  });
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Delete this absence record?')) {
-      setAbsences(absences.filter(a => a.id !== id));
+  // ========== FETCH FROM BACKEND ==========
+  const fetchAbsences = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/absences');
+      if (!response.ok) throw new Error('Erreur chargement');
+      const data = await response.json();
+      
+      const formattedAbsences: AbsenceRecord[] = (data || []).map((item: any) => ({
+        id: item.absence_id || item._id || `temp-${Date.now()}`,
+        employeeId: item.employee_id || '',
+        employee: item.name || item.employee || 'Unknown',
+        department: item.department || 'Unknown',
+        type: (item.type as AbsenceType) || 'Other',
+        days: item.days || 0,
+        startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
+      }));
+      
+      setAbsences(formattedAbsences);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching absences:', err);
+      setError('Impossible de charger les absences');
+      setAbsences([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddAbsence = () => {
-    const newId = (Math.max(...absences.map(a => parseInt(a.id)), 0) + 1).toString();
-    const newRecord: AbsenceRecord = {
-      id: newId,
-      employee: newAbsence.employee,
+  useEffect(() => {
+    fetchAbsences();
+  }, []);
+
+  // ========== ADD ABSENCE ==========
+  const handleAddAbsence = async () => {
+    if (!newAbsence.employeeId.trim()) { alert("L'ID employé est requis"); return; }
+    if (!newAbsence.employee.trim()) { alert("Le nom est requis"); return; }
+    if (!newAbsence.department) { alert("Le département est requis"); return; }
+    if (newAbsence.days < 1) { alert("Les jours doivent être >= 1"); return; }
+    if (!newAbsence.startDate) { alert("La date est requise"); return; }
+
+    const payload = {
+      absence_id: `ABS${Date.now()}`,
+      employee_id: newAbsence.employeeId,
+      name: newAbsence.employee,
       department: newAbsence.department,
       type: newAbsence.type,
       days: newAbsence.days,
       startDate: newAbsence.startDate,
     };
-    setAbsences([...absences, newRecord]);
-    setShowAddModal(false);
-    setNewAbsence({ employee: '', department: '', type: 'Sick leave', days: 1, startDate: '' });
+
+    try {
+      const response = await fetch('/api/absences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Erreur ajout');
+      await fetchAbsences();
+      setShowAddModal(false);
+      setNewAbsence({ employeeId: '', employee: '', department: '', type: 'Sick leave', days: 1, startDate: '' });
+    } catch (err) {
+      alert('Erreur lors de l\'ajout');
+    }
   };
 
+  // ========== DELETE ABSENCE ==========
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Supprimer cet enregistrement ?')) return;
+    try {
+      const response = await fetch(`/api/absences/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur suppression');
+      await fetchAbsences();
+    } catch (err) {
+      alert('Erreur lors de la suppression');
+    }
+  };
+
+  // ========== EDIT ABSENCE ==========
   const handleEditClick = (record: AbsenceRecord) => {
     setEditingRecord(record);
     setEditForm({
-      employee: record.employee,
-      department: record.department,
-      type: record.type,
-      days: record.days,
-      startDate: record.startDate,
+      employeeId: record.employeeId || '',
+      employee: record.employee || '',
+      department: record.department || '',
+      type: record.type || 'Sick leave',
+      days: record.days || 1,
+      startDate: record.startDate || '',
     });
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingRecord) return;
-    const updatedRecord: AbsenceRecord = {
-      ...editingRecord,
-      employee: editForm.employee,
+    
+    const payload = {
+      name: editForm.employee,
       department: editForm.department,
       type: editForm.type,
       days: editForm.days,
       startDate: editForm.startDate,
     };
-    setAbsences(absences.map(a => a.id === editingRecord.id ? updatedRecord : a));
-    setShowEditModal(false);
-    setEditingRecord(null);
+
+    try {
+      const response = await fetch(`/api/absences/${editingRecord.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Erreur modification');
+      await fetchAbsences();
+      setShowEditModal(false);
+      setEditingRecord(null);
+    } catch (err) {
+      alert('Erreur lors de la modification');
+    }
   };
 
+  // ========== EXPORT CSV ==========
   const handleExport = () => {
-    const headers = ['Employee', 'Department', 'Type', 'Days', 'Start Date'];
-    const rows = filteredAbsences.map(a => [a.employee, a.department, a.type, a.days, a.startDate]);
+    if (absences.length === 0) {
+      alert('Aucune donnée à exporter');
+      return;
+    }
+    const headers = ['Employee ID', 'Employee', 'Department', 'Type', 'Days', 'Start Date'];
+    const rows = absences.map(a => [
+      a.employeeId || '',
+      a.employee || '',
+      a.department || '',
+      a.type || '',
+      a.days || 0,
+      a.startDate || '',
+    ]);
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -154,6 +186,40 @@ const AbsenceManagement: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // ========== CALCULATIONS ==========
+  const departmentAbsences = absences.reduce((acc: any[], curr) => {
+    if (!curr.department) return acc;
+    const existing = acc.find(a => a.department === curr.department);
+    if (existing) {
+      existing.absences += (curr.days || 0);
+    } else {
+      acc.push({ department: curr.department, absences: curr.days || 0 });
+    }
+    return acc;
+  }, []);
+
+  const totalAbsenceDays = absences.reduce((sum, a) => sum + (a.days || 0), 0);
+  const overallAbsenceRate = absences.length ? ((totalAbsenceDays / (absences.length * 30)) * 100).toFixed(1) : 0;
+  const employeesMoreThan3Absences = new Set(absences.filter(a => (a.days || 0) > 3).map(a => a.employee)).size;
+
+  const departmentList = Array.from(new Set(absences.map(a => a.department).filter(Boolean))).sort();
+  const departments = ['All departments', ...departmentList];
+  const types = ['All types', ...new Set(absences.map(a => a.type).filter(Boolean))];
+
+  const filteredAbsences = absences.filter(rec => {
+    if (!rec) return false;
+    const searchLower = (searchTerm || '').toLowerCase();
+    const matchSearch = (rec.employee || '').toLowerCase().includes(searchLower) ||
+                        (rec.department || '').toLowerCase().includes(searchLower) ||
+                        (rec.employeeId || '').toLowerCase().includes(searchLower);
+    const matchDept = departmentFilter === 'All departments' || rec.department === departmentFilter;
+    const matchType = typeFilter === 'All types' || rec.type === typeFilter;
+    return matchSearch && matchDept && matchType;
+  });
+
+  if (loading) return <div style={{ marginLeft: '260px', padding: '2rem' }}>Chargement des absences...</div>;
+  if (error) return <div style={{ color: 'red', marginLeft: '260px', padding: '2rem' }}>{error}</div>;
 
   return (
     <div>
@@ -183,7 +249,7 @@ const AbsenceManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Graph + Buttons */}
+        {/* Chart */}
         <div className="chart-section">
           <div className="chart-header">
             <h2>Absence by department</h2>
@@ -194,9 +260,9 @@ const AbsenceManagement: React.FC = () => {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={departmentAbsences} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+              <BarChart data={departmentAbsences}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" angle={-20} textAnchor="end" height={60} tick={{ fontSize: 12 }} />
+                <XAxis dataKey="department" />
                 <YAxis />
                 <Tooltip formatter={(value) => `${value} days`} />
                 <Legend />
@@ -206,7 +272,7 @@ const AbsenceManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Tableau des absences */}
+        {/* Table */}
         <div className="records-section">
           <div className="records-header">
             <h2>Absence records</h2>
@@ -215,7 +281,7 @@ const AbsenceManagement: React.FC = () => {
           <div className="filters-bar">
             <input
               type="text"
-              placeholder="Search employees, departments..."
+              placeholder="Search employees, ID, departments..."
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -233,6 +299,7 @@ const AbsenceManagement: React.FC = () => {
             <table className="absence-table">
               <thead>
                 <tr>
+                  <th>Employee ID</th>
                   <th>Employee</th>
                   <th>Department</th>
                   <th>Type</th>
@@ -244,11 +311,12 @@ const AbsenceManagement: React.FC = () => {
               <tbody>
                 {filteredAbsences.map(rec => (
                   <tr key={rec.id}>
-                    <td>{rec.employee}</td>
-                    <td>{rec.department}</td>
-                    <td>{rec.type}</td>
-                    <td>{rec.days}</td>
-                    <td>{rec.startDate}</td>
+                    <td>{rec.employeeId || '-'}</td>
+                    <td>{rec.employee || '-'}</td>
+                    <td>{rec.department || '-'}</td>
+                    <td>{rec.type || '-'}</td>
+                    <td>{rec.days || 0}</td>
+                    <td>{rec.startDate || '-'}</td>
                     <td className="actions">
                       <button className="edit-btn" onClick={() => handleEditClick(rec)}>✏️</button>
                       <button className="delete-btn" onClick={() => handleDelete(rec.id)}>🗑️</button>
@@ -257,7 +325,7 @@ const AbsenceManagement: React.FC = () => {
                 ))}
                 {filteredAbsences.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="no-data">No absence records found.</td>
+                    <td colSpan={7} className="no-data">No absence records found.</td>
                   </tr>
                 )}
               </tbody>
@@ -266,25 +334,75 @@ const AbsenceManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Ajout */}
+      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Add absence record</h2>
             <div className="form-row">
-              <div className="form-group"><label>Employee name</label><input value={newAbsence.employee} onChange={e => setNewAbsence({...newAbsence, employee: e.target.value})} /></div>
-              <div className="form-group"><label>Department</label><input value={newAbsence.department} onChange={e => setNewAbsence({...newAbsence, department: e.target.value})} /></div>
+              <div className="form-group">
+                <label>Employee ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g., EMP001"
+                  value={newAbsence.employeeId}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, employeeId: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Employee name</label>
+                <input
+                  type="text"
+                  placeholder="Full name"
+                  value={newAbsence.employee}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, employee: e.target.value })}
+                />
+              </div>
             </div>
             <div className="form-row">
-              <div className="form-group"><label>Type</label>
-                <select value={newAbsence.type} onChange={e => setNewAbsence({...newAbsence, type: e.target.value as AbsenceType})}>
-                  <option>Sick leave</option><option>Vacation</option><option>Maternity</option><option>Other</option>
+              <div className="form-group">
+                <label>Department</label>
+                <select
+                  value={newAbsence.department}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, department: e.target.value })}
+                  required
+                >
+                  <option value="">-- Select Department --</option>
+                  {departmentList.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
                 </select>
               </div>
-              <div className="form-group"><label>Days</label><input type="number" value={newAbsence.days} onChange={e => setNewAbsence({...newAbsence, days: parseInt(e.target.value)})} /></div>
+              <div className="form-group">
+                <label>Type</label>
+                <select
+                  value={newAbsence.type}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, type: e.target.value as AbsenceType })}
+                >
+                  <option>Sick leave</option>
+                  <option>Vacation</option>
+                  <option>Maternity</option>
+                  <option>non justifer</option>
+                </select>
+              </div>
             </div>
             <div className="form-row">
-              <div className="form-group"><label>Start date</label><input type="date" value={newAbsence.startDate} onChange={e => setNewAbsence({...newAbsence, startDate: e.target.value})} /></div>
+              <div className="form-group">
+                <label>Days</label>
+                <input
+                  type="number"
+                  value={newAbsence.days}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, days: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Start date</label>
+                <input
+                  type="date"
+                  value={newAbsence.startDate}
+                  onChange={(e) => setNewAbsence({ ...newAbsence, startDate: e.target.value })}
+                />
+              </div>
             </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
@@ -294,25 +412,73 @@ const AbsenceManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Édition */}
+      {/* Edit Modal */}
       {showEditModal && editingRecord && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Edit absence record</h2>
             <div className="form-row">
-              <div className="form-group"><label>Employee name</label><input value={editForm.employee} onChange={e => setEditForm({...editForm, employee: e.target.value})} /></div>
-              <div className="form-group"><label>Department</label><input value={editForm.department} onChange={e => setEditForm({...editForm, department: e.target.value})} /></div>
+              <div className="form-group">
+                <label>Employee ID</label>
+                <input
+                  type="text"
+                  value={editForm.employeeId}
+                  onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Employee name</label>
+                <input
+                  type="text"
+                  value={editForm.employee}
+                  onChange={(e) => setEditForm({ ...editForm, employee: e.target.value })}
+                />
+              </div>
             </div>
             <div className="form-row">
-              <div className="form-group"><label>Type</label>
-                <select value={editForm.type} onChange={e => setEditForm({...editForm, type: e.target.value as AbsenceType})}>
-                  <option>Sick leave</option><option>Vacation</option><option>Maternity</option><option>Other</option>
+              <div className="form-group">
+                <label>Department</label>
+                <select
+                  value={editForm.department}
+                  onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                  required
+                >
+                  <option value="">-- Select Department --</option>
+                  {departmentList.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
                 </select>
               </div>
-              <div className="form-group"><label>Days</label><input type="number" value={editForm.days} onChange={e => setEditForm({...editForm, days: parseInt(e.target.value)})} /></div>
+              <div className="form-group">
+                <label>Type</label>
+                <select
+                  value={editForm.type}
+                  onChange={(e) => setEditForm({ ...editForm, type: e.target.value as AbsenceType })}
+                >
+                  <option>Sick leave</option>
+                  <option>Vacation</option>
+                  <option>Maternity</option>
+                  <option>non justifer</option>
+                </select>
+              </div>
             </div>
             <div className="form-row">
-              <div className="form-group"><label>Start date</label><input type="date" value={editForm.startDate} onChange={e => setEditForm({...editForm, startDate: e.target.value})} /></div>
+              <div className="form-group">
+                <label>Days</label>
+                <input
+                  type="number"
+                  value={editForm.days}
+                  onChange={(e) => setEditForm({ ...editForm, days: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Start date</label>
+                <input
+                  type="date"
+                  value={editForm.startDate}
+                  onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                />
+              </div>
             </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
