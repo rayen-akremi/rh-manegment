@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
+import { 
+  Users, Clock, TrendingUp, TrendingDown, Calendar, 
+  Award, BarChart3, PieChart as PieChartIcon 
+} from 'lucide-react';
 import Navbar from './Navbar';
 import '../style/Dashboard.css';
 
-// Types pour les données
 interface KpiData {
   absenceRate: number;
   turnoverRate: number;
@@ -33,6 +37,19 @@ interface TopEmployee {
   hours?: number;
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [kpi, setKpi] = useState<KpiData>({
@@ -46,36 +63,54 @@ const Dashboard: React.FC = () => {
   const [topAbsences, setTopAbsences] = useState<TopEmployee[]>([]);
   const [topOvertime, setTopOvertime] = useState<TopEmployee[]>([]);
 
-  // Fonction pour récupérer toutes les données
+  // Fetch real data from backend
   const fetchDashboardData = async () => {
     try {
-      // Remplacer les URLs par vos endpoints réels
-      const [kpiRes, monthlyRes, reasonsRes, topAbsRes, topOvertimeRes] = await Promise.all([
-        fetch('/api/dashboard/kpi'),
-        fetch('/api/dashboard/monthly'),
-        fetch('/api/dashboard/absence-reasons'),
-        fetch('/api/dashboard/top-absences'),
-        fetch('/api/dashboard/top-overtime'),
-      ]);
-
-      if (!kpiRes.ok || !monthlyRes.ok || !reasonsRes.ok || !topAbsRes.ok || !topOvertimeRes.ok) {
-        throw new Error('Erreur lors du chargement des données');
+      setLoading(true);
+      
+      // Fetch KPI data
+      const kpiRes = await fetch('/api/dashboard/kpi');
+      if (kpiRes.ok) {
+        const kpiData = await kpiRes.json();
+        setKpi(kpiData);
       }
-
-      const kpiData = await kpiRes.json();
-      const monthlyData = await monthlyRes.json();
-      const reasonsData = await reasonsRes.json();
-      const topAbsencesData = await topAbsRes.json();
-      const topOvertimeData = await topOvertimeRes.json();
-
-      setKpi(kpiData);
-      setMonthlyData(monthlyData);
-      setAbsenceReasons(reasonsData);
-      setTopAbsences(topAbsencesData);
-      setTopOvertime(topOvertimeData);
+      
+      // Fetch monthly data
+      const monthlyRes = await fetch('/api/dashboard/monthly');
+      if (monthlyRes.ok) {
+        const monthlyDataRaw = await monthlyRes.json();
+        setMonthlyData(monthlyDataRaw);
+      }
+      
+      // Fetch absence reasons
+      const reasonsRes = await fetch('/api/dashboard/absence-reasons');
+      if (reasonsRes.ok) {
+        const reasonsData = await reasonsRes.json();
+        if (reasonsData.length > 0) {
+          setAbsenceReasons(reasonsData);
+        }
+      }
+      
+      // Fetch top absences
+      const topAbsRes = await fetch('/api/dashboard/top-absences');
+      if (topAbsRes.ok) {
+        const topAbsData = await topAbsRes.json();
+        if (topAbsData.length > 0) {
+          setTopAbsences(topAbsData);
+        }
+      }
+      
+      // Fetch top overtime
+      const topOvertimeRes = await fetch('/api/dashboard/top-overtime');
+      if (topOvertimeRes.ok) {
+        const topOvertimeData = await topOvertimeRes.json();
+        if (topOvertimeData.length > 0) {
+          setTopOvertime(topOvertimeData);
+        }
+      }
+      
     } catch (error) {
-      console.error('Erreur chargement dashboard:', error);
-      // Option : afficher un message d'erreur à l'utilisateur
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -96,133 +131,187 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Définir des couleurs par défaut pour le camembert si non fournies
-  const defaultColors = ['#ef4444', '#3b82f6', '#f59e0b', '#10b981'];
-  const pieData = absenceReasons.map((item, idx) => ({
-    ...item,
-    color: item.color || defaultColors[idx % defaultColors.length]
-  }));
+  const stats = [
+    {
+      title: "TAUX D'ABSENCE",
+      value: `${kpi.absenceRate}%`,
+      trend: "+0.6",
+      trendUp: true,
+      icon: <Calendar size={24} />,
+      color: "#ef4444"
+    },
+    {
+      title: "TAUX DE TURNOVER",
+      value: `${kpi.turnoverRate}%`,
+      trend: "-0.3",
+      trendUp: false,
+      icon: <Users size={24} />,
+      color: "#3b82f6"
+    },
+    {
+      title: "EMPLOYÉS TOTAUX",
+      value: kpi.totalEmployees.toLocaleString(),
+      trend: "+24",
+      trendUp: true,
+      icon: <Award size={24} />,
+      color: "#10b981"
+    },
+    {
+      title: "HEURES SUPPLÉMENTAIRES",
+      value: `${kpi.overtimeHours.toLocaleString()} h`,
+      trend: "+8.2%",
+      trendUp: true,
+      icon: <Clock size={24} />,
+      color: "#f59e0b"
+    }
+  ];
 
   return (
     <div>
       <Navbar />
       <div className="dashboard-container">
-        <div className="dashboard-header">
-          <h1>Tableau de bord RH</h1>
-          <p>Votre démonstration de la situation du territoire</p>
-        </div>
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="dashboard-inner"
+        >
+          <motion.div variants={itemVariants} className="dashboard-header">
+            <h1 className="gradient-text">Tableau de bord RH</h1>
+          </motion.div>
 
-        {/* KPI Cards */}
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <div className="kpi-title">TAUX D'ABSENCE</div>
-            <div className="kpi-value">{kpi.absenceRate} %</div>
-            <div className="kpi-trend up">↗ +0,6 pt vs mois dernier</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">TAUX DE TURNOVER</div>
-            <div className="kpi-value">{kpi.turnoverRate} %</div>
-            <div className="kpi-trend down">↘ -0,3 pt vs mois dernier</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">EMPLOYÉS TOTAUX</div>
-            <div className="kpi-value">{kpi.totalEmployees.toLocaleString()}</div>
-            <div className="kpi-trend up">↗ +24 vs mois dernier</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">HEURES SUPPLÉMENTAIRES</div>
-            <div className="kpi-value">{kpi.overtimeHours.toLocaleString()} h</div>
-            <div className="kpi-trend up">↗ +8,2 % vs mois dernier</div>
-          </div>
-        </div>
-
-        {/* Première ligne : Évolution mensuelle + Répartition des absences */}
-        <div className="two-columns">
-          <div className="chart-card">
-            <h2>Évolution mensuelle</h2>
-            <p className="chart-subtitle">Taux d'absence et de turnover sur 6 mois</p>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis domain={[0, 8]} tickFormatter={(value) => `${value}%`} />
-                <Tooltip formatter={(value) => `${value}%`} />
-                <Legend />
-                <Line type="monotone" dataKey="absence" stroke="#ef4444" name="Taux d'absence" strokeWidth={2} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="turnover" stroke="#3b82f6" name="Taux de turnover" strokeWidth={2} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="chart-card">
-            <h2>Répartition des absences</h2>
-            <p className="chart-subtitle">Par motif</p>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  labelLine={{ stroke: '#64748b', strokeWidth: 1 }}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => `${value}%`} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pie-legend">
-              {pieData.map(item => (
-                <div key={item.name} className="legend-item">
-                  <span className="legend-color" style={{ backgroundColor: item.color }}></span>
-                  <span>{item.name}</span>
-                  <span className="legend-value">{item.value}%</span>
+          <motion.div variants={itemVariants} className="stats-grid">
+            {stats.map((stat, idx) => (
+              <div key={idx} className="stat-card">
+                <div className="stat-icon" style={{ background: `${stat.color}15`, color: stat.color }}>
+                  {stat.icon}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+                <div className="stat-value">{stat.value}</div>
+                <div className="stat-label">{stat.title}</div>
+                <div className={`stat-trend ${stat.trendUp ? 'up' : 'down'}`}>
+                  {stat.trendUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                  {stat.trend} vs mois dernier
+                </div>
+              </div>
+            ))}
+          </motion.div>
 
-        {/* Deuxième ligne : Top absences et Top overtime */}
-        <div className="two-columns">
-          <div className="list-card">
-            <h2>Top absences</h2>
-            <div className="ranking-list">
-              {topAbsences.map((item, idx) => (
-                <div key={idx} className="ranking-item">
-                  <div className="rank-number">{idx + 1}</div>
-                  <div className="rank-info">
-                    <div className="rank-name">{item.name}</div>
-                    <div className="rank-dept">{item.department}</div>
+          <motion.div variants={itemVariants} className="charts-row">
+            <div className="chart-card">
+              <div className="chart-header">
+                <div>
+                  <h3>Évolution mensuelle</h3>
+                  <p>Taux d'absence et de turnover sur 6 mois</p>
+                </div>
+                <BarChart3 size={20} className="chart-icon" />
+              </div>
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyData.length > 0 ? monthlyData : [
+                    { month: 'Jan', absence: 0, turnover: 0 },
+                    { month: 'Fév', absence: 0, turnover: 0 },
+                    { month: 'Mar', absence: 0, turnover: 0 },
+                    { month: 'Avr', absence: 0, turnover: 0 },
+                    { month: 'Mai', absence: 0, turnover: 0 },
+                    { month: 'Juin', absence: 0, turnover: 0 }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="month" stroke="var(--text-muted)" />
+                    <YAxis tickFormatter={(v) => `${v}%`} stroke="var(--text-muted)" />
+                    <Tooltip 
+                      contentStyle={{ background: 'var(--card-bg)', border: 'none', borderRadius: '12px' }}
+                      formatter={(value) => `${value}%`}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="absence" stroke="#ef4444" name="Taux d'absence" strokeWidth={2} dot={{ r: 4, fill: "#ef4444" }} />
+                    <Line type="monotone" dataKey="turnover" stroke="#3b82f6" name="Taux de turnover" strokeWidth={2} dot={{ r: 4, fill: "#3b82f6" }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="chart-card">
+              <div className="chart-header">
+                <div>
+                  <h3>Répartition des absences</h3>
+                  <p>Par motif</p>
+                </div>
+                <PieChartIcon size={20} className="chart-icon" />
+              </div>
+              <div className="pie-container">
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={absenceReasons.length > 0 ? absenceReasons : [{ name: 'Aucune donnée', value: 100, color: '#cbd5e1' }]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => percent ? `${name} ${(percent * 100).toFixed(0)}%` : name}
+                      labelLine={{ stroke: 'var(--text-muted)', strokeWidth: 1 }}
+                    >
+                      {(absenceReasons.length > 0 ? absenceReasons : [{ name: 'Aucune donnée', value: 100, color: '#cbd5e1' }]).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value}%`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {absenceReasons.length > 0 && (
+                  <div className="pie-legend">
+                    {absenceReasons.map(item => (
+                      <div key={item.name} className="legend-item">
+                        <span className="legend-color" style={{ backgroundColor: item.color }}></span>
+                        <span>{item.name}</span>
+                        <span className="legend-value">{item.value}%</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="rank-value">{item.days} d</div>
-                </div>
-              ))}
+                )}
+              </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="list-card">
-            <h2>Top overtime</h2>
-            <div className="ranking-list">
-              {topOvertime.map((item, idx) => (
-                <div key={idx} className="ranking-item">
-                  <div className="rank-number">{idx + 1}</div>
-                  <div className="rank-info">
-                    <div className="rank-name">{item.name}</div>
-                    <div className="rank-dept">{item.department}</div>
+          <motion.div variants={itemVariants} className="lists-row">
+            <div className="list-card">
+              <h3>🏆 Top absences</h3>
+              <div className="rank-list">
+                {topAbsences.length > 0 ? topAbsences.map((item, idx) => (
+                  <div key={idx} className="rank-item">
+                    <div className="rank-number">{idx + 1}</div>
+                    <div className="rank-info">
+                      <div className="rank-name">{item.name}</div>
+                      <div className="rank-dept">{item.department}</div>
+                    </div>
+                    <div className="rank-value">{item.days} jours</div>
                   </div>
-                  <div className="rank-value">{item.hours} h</div>
-                </div>
-              ))}
+                )) : (
+                  <div className="no-data">Aucune donnée disponible</div>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+
+            <div className="list-card">
+              <h3>⚡ Top overtime</h3>
+              <div className="rank-list">
+                {topOvertime.length > 0 ? topOvertime.map((item, idx) => (
+                  <div key={idx} className="rank-item">
+                    <div className="rank-number">{idx + 1}</div>
+                    <div className="rank-info">
+                      <div className="rank-name">{item.name}</div>
+                      <div className="rank-dept">{item.department}</div>
+                    </div>
+                    <div className="rank-value">{item.hours} heures</div>
+                  </div>
+                )) : (
+                  <div className="no-data">Aucune donnée disponible</div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );

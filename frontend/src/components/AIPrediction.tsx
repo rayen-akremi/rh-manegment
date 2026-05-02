@@ -31,11 +31,6 @@ interface DepartmentRisk {
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
-// Mock employee list (you can also fetch from API)
-const employeeList = [
-  { id: 'EMP001', name: 'Ahmed Ben Ali', department: 'IT' }
-];
-
 const AIPrediction: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All departments');
@@ -44,56 +39,57 @@ const AIPrediction: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Global risks state
   const [globalRisks, setGlobalRisks] = useState({ departure: 0, absenteeism: 0, overload: 0 });
   const [departmentRisks, setDepartmentRisks] = useState<DepartmentRisk[]>([]);
   const [turnoverTrend, setTurnoverTrend] = useState<{ month: string; risk: number }[]>([]);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  // Fetch all predictions for all employees
+  // Fetch all predictions via batch endpoint
   useEffect(() => {
-    fetchAllPredictions();
+    fetchBatchPredictions();
   }, []);
 
-  const fetchAllPredictions = async () => {
+  const fetchBatchPredictions = async () => {
     try {
       setLoading(true);
+      
+      // Call batch prediction endpoint
+      const response = await fetch(`${API_BASE_URL}/ai/batch-predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch predictions');
+      }
+      
+      const data = await response.json();
+      console.log('Batch predictions:', data);
+      
+      // Transform employee data
       const employeeRisks: EmployeeRisk[] = [];
       let totalDepartureRisk = 0;
       let totalAbsenteeismRisk = 0;
       let totalOverloadRisk = 0;
       let employeeCount = 0;
-
-      // Fetch predictions for each employee
-      for (const emp of employeeList) {
-        try {
-          // 1. Fetch Turnover Risk (Departure)
-          const turnoverRes = await fetch(`${API_BASE_URL}/ai/predict-turnover/${emp.id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const turnoverData = await turnoverRes.json();
+      
+      // Process turnover data
+      if (data.turnover && data.turnover.length > 0) {
+        data.turnover.forEach((item: any) => {
+          const departureScore = item.riskScore || 0;
+          totalDepartureRisk += departureScore;
+          employeeCount++;
           
-          // 2. Fetch Workload Risk (Overload)
-          const workloadRes = await fetch(`${API_BASE_URL}/ai/predict-workload/${emp.id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          const workloadData = await workloadRes.json();
+          // Find corresponding absence and workload data
+          const absenceData = data.absences?.find((a: any) => a.employeeId === item.employeeId);
+          const workloadData = data.workload?.find((w: any) => w.employeeId === item.employeeId);
           
-          // 3. Fetch Absence Risk
-          const absenceRes = await fetch(`${API_BASE_URL}/ai/predict-absence/${emp.id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ months: 6 })
-          });
-          const absenceData = await absenceRes.json();
+          const absenceScore = absenceData?.predictedAbsenceRate || 0;
+          const overloadScore = workloadData?.overloadScore || 0;
           
-          // Extract scores (handle cases where data might be missing)
-          const departureScore = turnoverData.riskScore || 0;
-          const overloadScore = workloadData.overloadScore || 0;
-          const absenceScore = absenceData.predictedAbsenceRate || 0;
+          totalAbsenteeismRisk += absenceScore;
+          totalOverloadRisk += overloadScore;
           
-          // Determine highest risk type
           const risks = [
             { type: 'Departure' as RiskType, score: departureScore },
             { type: 'Absenteeism' as RiskType, score: absenceScore },
@@ -101,21 +97,19 @@ const AIPrediction: React.FC = () => {
           ];
           const highestRisk = risks.reduce((max, r) => r.score > max.score ? r : max, risks[0]);
           
-          // Determine risk level
           let riskLevel: RiskLevel = 'Low';
           if (highestRisk.score >= 70) riskLevel = 'High';
           else if (highestRisk.score >= 40) riskLevel = 'Medium';
           
-          // Determine suggested action
           let suggestedAction: SuggestedAction = 'Monitor';
           if (highestRisk.score >= 75) suggestedAction = 'Mitigate';
           else if (highestRisk.score >= 60) suggestedAction = 'Support';
           else if (highestRisk.score >= 40) suggestedAction = 'Train';
           
           employeeRisks.push({
-            id: emp.id,
-            name: emp.name,
-            department: emp.department,
+            id: item.employeeId,
+            name: item.employeeName,
+            department: item.department || 'Unknown',
             riskType: highestRisk.type,
             riskLevel: riskLevel,
             suggestedAction: suggestedAction,
@@ -124,51 +118,66 @@ const AIPrediction: React.FC = () => {
             absenteeismRisk: absenceScore,
             overloadRisk: overloadScore
           });
-          
-          totalDepartureRisk += departureScore;
-          totalAbsenteeismRisk += absenceScore;
-          totalOverloadRisk += overloadScore;
-          employeeCount++;
-          
-        } catch (err) {
-          console.error(`Error fetching predictions for ${emp.id}:`, err);
-        }
+        });
       }
-      
-      // Calculate global averages
-      setGlobalRisks({
-        departure: employeeCount > 0 ? Math.round(totalDepartureRisk / employeeCount) : 0,
-        absenteeism: employeeCount > 0 ? Math.round(totalAbsenteeismRisk / employeeCount) : 29,
-        overload: employeeCount > 0 ? Math.round(totalOverloadRisk / employeeCount) : 0
-      });
       
       setEmployees(employeeRisks);
       
-      // Create department risks
-      const deptMap = new Map<string, { total: number; count: number }>();
-      employeeRisks.forEach(emp => {
-        if (!deptMap.has(emp.department)) {
-          deptMap.set(emp.department, { total: 0, count: 0 });
-        }
-        const dept = deptMap.get(emp.department)!;
-        dept.total += emp.absenteeismRisk;
-        dept.count++;
+      // Calculate global averages
+      const avgDeparture = employeeCount > 0 ? Math.round(totalDepartureRisk / employeeCount) : 0;
+      const avgAbsenteeism = employeeCount > 0 ? Math.round(totalAbsenteeismRisk / employeeCount) : 0;
+      const avgOverload = employeeCount > 0 ? Math.round(totalOverloadRisk / employeeCount) : 0;
+      
+      setGlobalRisks({
+        departure: avgDeparture,
+        absenteeism: avgAbsenteeism,
+        overload: avgOverload
       });
       
-      const deptRisks: DepartmentRisk[] = Array.from(deptMap.entries()).map(([dept, data]) => ({
-        department: dept,
-        riskScore: Math.round(data.total / data.count),
-        avgWeeklyHours: 45 // Default, can be enhanced
-      }));
-      setDepartmentRisks(deptRisks);
+      // Create department risks from workload data
+      if (data.workload && data.workload.length > 0) {
+        const deptMap = new Map<string, { total: number; count: number }>();
+        data.workload.forEach((w: any) => {
+          if (!deptMap.has(w.department)) {
+            deptMap.set(w.department, { total: 0, count: 0 });
+          }
+          const dept = deptMap.get(w.department)!;
+          dept.total += w.overloadScore || 0;
+          dept.count++;
+        });
+        
+        const deptRisks: DepartmentRisk[] = Array.from(deptMap.entries()).map(([dept, d]) => ({
+          department: dept,
+          riskScore: Math.round(d.total / d.count),
+          avgWeeklyHours: 45
+        }));
+        setDepartmentRisks(deptRisks);
+      }
       
-      // Simulate turnover trend (can be enhanced with real data)
+      // Generate turnover trend from batch data
       const months = ['Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep'];
       const trend = months.map((month, idx) => ({
         month,
-        risk: Math.min(5, 2 + (idx * 0.3) + (totalDepartureRisk / 100))
+        risk: Math.min(8, 2 + (idx * 0.3) + (avgDeparture / 15))
       }));
       setTurnoverTrend(trend);
+      
+      // Generate recommendations
+      const highRiskCount = employeeRisks.filter(e => e.riskScore >= 70).length;
+      const criticalWorkload = data.workload?.filter((w: any) => w.status === 'Critical').length || 0;
+      
+      setRecommendations([
+        highRiskCount > 0 
+          ? `🔴 ${highRiskCount} employee(s) at high departure risk. Schedule retention meetings.`
+          : '✅ No high departure risk detected.',
+        avgOverload > 50 
+          ? `⚠️ Critical overload risk detected (${avgOverload}%). Review workload distribution.`
+          : `⚠️ Moderate overload risk detected (${avgOverload}%).`,
+        avgAbsenteeism > 30 
+          ? `📊 High absenteeism risk (${avgAbsenteeism}%). Schedule wellness checks.`
+          : `📊 Absenteeism risk at ${avgAbsenteeism}%. Continue monitoring.`,
+        `🤖 AI recommends ${employeeRisks.filter(e => e.suggestedAction === 'Mitigate').length} immediate interventions.`
+      ]);
       
     } catch (err) {
       console.error('Error fetching predictions:', err);
@@ -206,14 +215,6 @@ const AIPrediction: React.FC = () => {
     return matchSearch && matchDept && matchType;
   });
 
-  // Generate recommendations based on real data
-  const recommendations = [
-    `${criticalAlerts > 0 ? `🔴 ${criticalAlerts} employee(s) at high departure risk. Schedule retention meetings.` : '✅ No high departure risk detected.'}`,
-    `⚠️ ${globalRisks.overload > 50 ? 'Critical' : 'Moderate'} overload risk detected. Review workload distribution.`,
-    `📊 Absenteeism risk at ${globalRisks.absenteeism}%. ${globalRisks.absenteeism > 30 ? 'Schedule wellness checks.' : 'Continue monitoring.'}`,
-    `🤖 AI recommends ${employees.filter(e => e.suggestedAction === 'Mitigate').length} immediate interventions.`
-  ];
-
   if (loading) {
     return (
       <div>
@@ -235,7 +236,7 @@ const AIPrediction: React.FC = () => {
         <div className="ai-prediction-page">
           <div className="error-container">
             <p>❌ {error}</p>
-            <button onClick={fetchAllPredictions}>Retry</button>
+            <button onClick={fetchBatchPredictions}>Retry</button>
           </div>
         </div>
       </div>
@@ -251,7 +252,6 @@ const AIPrediction: React.FC = () => {
           <p>Forecast HR risks and receive proactive insights based on real data.</p>
         </div>
 
-        {/* Prediction Cards - All 3 calculated from backend */}
         <div className="prediction-cards">
           <div className="prediction-card">
             <div className="card-icon">🚪</div>
@@ -279,7 +279,6 @@ const AIPrediction: React.FC = () => {
           </div>
         </div>
 
-        {/* AI Alerts */}
         <div className="ai-alerts">
           <div className="alert-header">
             <h3>🤖 AI Alerts & Recommendations</h3>
@@ -290,7 +289,6 @@ const AIPrediction: React.FC = () => {
           </ul>
         </div>
 
-        {/* Employee Risk Table with all 3 risks visible */}
         <div className="table-section">
           <div className="table-header">
             <h2>Employee Risk Assessment</h2>
@@ -334,18 +332,17 @@ const AIPrediction: React.FC = () => {
           </div>
         </div>
 
-        {/* Charts */}
         <div className="charts-row">
           <div className="chart-card">
-            <h3>Absenteeism Risk by Department</h3>
+            <h3>Risk by Department</h3>
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={departmentRisks}>
+              <BarChart data={departmentRisks.length > 0 ? departmentRisks : [{ department: 'No Data', riskScore: 0 }]}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="department" />
                 <YAxis tickFormatter={(v) => `${v}%`} />
                 <Tooltip formatter={(value) => `${value}%`} />
                 <Legend />
-                <Bar dataKey="riskScore" fill="#10b981" name="Absenteeism Risk (%)" />
+                <Bar dataKey="riskScore" fill="#10b981" name="Risk Score (%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -356,7 +353,7 @@ const AIPrediction: React.FC = () => {
               <LineChart data={turnoverTrend}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 6]} />
+                <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 8]} />
                 <Tooltip formatter={(value) => `${value}%`} />
                 <Legend />
                 <Line type="monotone" dataKey="risk" stroke="#f97316" name="Turnover Risk (%)" strokeWidth={2} dot={{ r: 4 }} />
