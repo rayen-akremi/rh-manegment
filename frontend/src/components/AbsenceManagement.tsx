@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import Navbar from './Navbar';
 import '../style/AbsenceManagement.css';
 
-type AbsenceType = 'Sick leave' | 'Vacation' | 'Maternity' | 'non justifer';
+type AbsenceType = 'Sick leave' | 'Vacation' | 'Maternity' | 'Other';
 
 interface AbsenceRecord {
   id: string;
@@ -17,8 +17,16 @@ interface AbsenceRecord {
   startDate: string;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+  department: string;
+  matricule: string;
+}
+
 const AbsenceManagement: React.FC = () => {
   const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +35,13 @@ const AbsenceManagement: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AbsenceRecord | null>(null);
+  
+  // Searchable select states
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
   const [newAbsence, setNewAbsence] = useState({
     employeeId: '',
     employee: '',
@@ -44,7 +59,60 @@ const AbsenceManagement: React.FC = () => {
     startDate: '',
   });
 
-  // ========== FETCH FROM BACKEND ==========
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter employees based on search term (search by name, id, or matricule)
+  const filteredEmployees = employees.filter(emp => {
+    const searchLower = employeeSearchTerm.toLowerCase();
+    return emp.name.toLowerCase().includes(searchLower) || 
+           emp.id.toLowerCase().includes(searchLower) ||
+           emp.matricule.toLowerCase().includes(searchLower);
+  });
+
+  // Fetch all employees from backend
+  const fetchEmployees = async () => {
+    try {
+      const response = await fetch('/api/employees');
+      if (!response.ok) throw new Error('Erreur chargement employés');
+      const data = await response.json();
+      
+      // Handle different response structures
+      let employeeArray = [];
+      if (Array.isArray(data)) {
+        employeeArray = data;
+      } else if (data.employees && Array.isArray(data.employees)) {
+        employeeArray = data.employees;
+      } else if (data.data && Array.isArray(data.data)) {
+        employeeArray = data.data;
+      } else {
+        employeeArray = [];
+      }
+      
+      // Map employee data correctly with matricule
+      const employeeList: Employee[] = employeeArray.map((emp: any) => ({
+        id: emp.employee_id || emp.matricule || emp.id,
+        name: `${emp.prenom || ''} ${emp.nom || ''}`.trim() || emp.name || `Employee ${emp.matricule || emp.employee_id}`,
+        department: emp.departement || emp.department || 'Unknown',
+        matricule: emp.matricule || emp.employee_id || emp.id || ''
+      }));
+      
+      console.log('Loaded employees:', employeeList);
+      setEmployees(employeeList);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
+
+  // Fetch all absences from backend
   const fetchAbsences = async () => {
     try {
       setLoading(true);
@@ -52,7 +120,16 @@ const AbsenceManagement: React.FC = () => {
       if (!response.ok) throw new Error('Erreur chargement');
       const data = await response.json();
       
-      const formattedAbsences: AbsenceRecord[] = (data || []).map((item: any) => ({
+      let absencesArray = [];
+      if (Array.isArray(data)) {
+        absencesArray = data;
+      } else if (data.absences && Array.isArray(data.absences)) {
+        absencesArray = data.absences;
+      } else {
+        absencesArray = [];
+      }
+      
+      const formattedAbsences: AbsenceRecord[] = absencesArray.map((item: any) => ({
         id: item.absence_id || item._id || `temp-${Date.now()}`,
         employeeId: item.employee_id || '',
         employee: item.name || item.employee || 'Unknown',
@@ -74,14 +151,38 @@ const AbsenceManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    fetchEmployees();
     fetchAbsences();
   }, []);
 
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setNewAbsence({
+      ...newAbsence,
+      employeeId: employee.id,
+      employee: employee.name,
+      department: employee.department,
+    });
+    setEmployeeSearchTerm('');
+    setIsDropdownOpen(false);
+  };
+
+  // Clear selected employee
+  const handleClearEmployee = () => {
+    setSelectedEmployee(null);
+    setNewAbsence({
+      ...newAbsence,
+      employeeId: '',
+      employee: '',
+      department: '',
+    });
+    setEmployeeSearchTerm('');
+  };
+
   // ========== ADD ABSENCE ==========
   const handleAddAbsence = async () => {
-    if (!newAbsence.employeeId.trim()) { alert("L'ID employé est requis"); return; }
-    if (!newAbsence.employee.trim()) { alert("Le nom est requis"); return; }
-    if (!newAbsence.department) { alert("Le département est requis"); return; }
+    if (!newAbsence.employeeId.trim()) { alert("Veuillez sélectionner un employé"); return; }
     if (newAbsence.days < 1) { alert("Les jours doivent être >= 1"); return; }
     if (!newAbsence.startDate) { alert("La date est requise"); return; }
 
@@ -104,6 +205,7 @@ const AbsenceManagement: React.FC = () => {
       if (!response.ok) throw new Error('Erreur ajout');
       await fetchAbsences();
       setShowAddModal(false);
+      setSelectedEmployee(null);
       setNewAbsence({ employeeId: '', employee: '', department: '', type: 'Sick leave', days: 1, startDate: '' });
     } catch (err) {
       alert('Erreur lors de l\'ajout');
@@ -205,7 +307,7 @@ const AbsenceManagement: React.FC = () => {
 
   const departmentList = Array.from(new Set(absences.map(a => a.department).filter(Boolean))).sort();
   const departments = ['All departments', ...departmentList];
-  const types = ['All types', ...new Set(absences.map(a => a.type).filter(Boolean))];
+  const types = ['All types', 'Sick leave', 'Vacation', 'Maternity', 'Other'];
 
   const filteredAbsences = absences.filter(rec => {
     if (!rec) return false;
@@ -334,45 +436,94 @@ const AbsenceManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Add Modal with Searchable Employee Selector */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Add absence record</h2>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Employee ID</label>
-                <input
-                  type="text"
-                  placeholder="e.g., EMP001"
-                  value={newAbsence.employeeId}
-                  onChange={(e) => setNewAbsence({ ...newAbsence, employeeId: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label>Employee name</label>
-                <input
-                  type="text"
-                  placeholder="Full name"
-                  value={newAbsence.employee}
-                  onChange={(e) => setNewAbsence({ ...newAbsence, employee: e.target.value })}
-                />
+            
+            {/* Searchable Employee Select */}
+            <div className="form-group" ref={dropdownRef}>
+              <label>Select Employee *</label>
+              <div className="searchable-select">
+                <div 
+                  className="select-input"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  {selectedEmployee ? (
+                    <div className="selected-employee">
+                      <span className="emp-name">{selectedEmployee.name}</span>
+                      <span className="emp-id">Matricule: {selectedEmployee.matricule}</span>
+                      <span className="emp-dept">- {selectedEmployee.department}</span>
+                      <button 
+                        className="clear-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearEmployee();
+                        }}
+                      >
+                        ✖
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="placeholder">Search by name, ID, or matricule...</span>
+                  )}
+                  <span className="dropdown-arrow">▼</span>
+                </div>
+                
+                {isDropdownOpen && (
+                  <div className="dropdown-list">
+                    <input
+                      type="text"
+                      className="dropdown-search"
+                      placeholder="Type name, ID, or matricule to search..."
+                      value={employeeSearchTerm}
+                      onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                    <div className="dropdown-items">
+                      {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map(emp => (
+                          <div
+                            key={emp.id}
+                            className="dropdown-item"
+                            onClick={() => handleEmployeeSelect(emp)}
+                          >
+                            <div className="item-name">{emp.name}</div>
+                            <div className="item-details">
+                              <span className="item-id">Matricule: {emp.matricule}</span>
+                              <span className="item-dept">{emp.department}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="no-results">No employees found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {selectedEmployee && (
+              <>
+                <div className="info-row">
+                  <span className="info-label">Department:</span>
+                  <span className="info-value">{newAbsence.department || '-'}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Employee ID:</span>
+                  <span className="info-value">{newAbsence.employeeId || '-'}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Matricule:</span>
+                  <span className="info-value">{selectedEmployee.matricule || '-'}</span>
+                </div>
+              </>
+            )}
+
             <div className="form-row">
-              <div className="form-group">
-                <label>Department</label>
-                <select
-                  value={newAbsence.department}
-                  onChange={(e) => setNewAbsence({ ...newAbsence, department: e.target.value })}
-                  required
-                >
-                  <option value="">-- Select Department --</option>
-                  {departmentList.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
               <div className="form-group">
                 <label>Type</label>
                 <select
@@ -382,19 +533,20 @@ const AbsenceManagement: React.FC = () => {
                   <option>Sick leave</option>
                   <option>Vacation</option>
                   <option>Maternity</option>
-                  <option>non justifer</option>
+                  <option>Other</option>
                 </select>
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
                 <label>Days</label>
                 <input
                   type="number"
+                  min="1"
                   value={newAbsence.days}
                   onChange={(e) => setNewAbsence({ ...newAbsence, days: parseInt(e.target.value) })}
                 />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
                 <label>Start date</label>
                 <input
@@ -419,36 +571,15 @@ const AbsenceManagement: React.FC = () => {
             <h2>Edit absence record</h2>
             <div className="form-row">
               <div className="form-group">
-                <label>Employee ID</label>
-                <input
-                  type="text"
-                  value={editForm.employeeId}
-                  onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })}
-                />
+                <label>Employee</label>
+                <input type="text" value={editForm.employee} readOnly disabled />
               </div>
               <div className="form-group">
-                <label>Employee name</label>
-                <input
-                  type="text"
-                  value={editForm.employee}
-                  onChange={(e) => setEditForm({ ...editForm, employee: e.target.value })}
-                />
+                <label>Department</label>
+                <input type="text" value={editForm.department} readOnly disabled />
               </div>
             </div>
             <div className="form-row">
-              <div className="form-group">
-                <label>Department</label>
-                <select
-                  value={editForm.department}
-                  onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                  required
-                >
-                  <option value="">-- Select Department --</option>
-                  {departmentList.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
               <div className="form-group">
                 <label>Type</label>
                 <select
@@ -458,11 +589,9 @@ const AbsenceManagement: React.FC = () => {
                   <option>Sick leave</option>
                   <option>Vacation</option>
                   <option>Maternity</option>
-                  <option>non justifer</option>
+                  <option>Other</option>
                 </select>
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
                 <label>Days</label>
                 <input
@@ -471,6 +600,8 @@ const AbsenceManagement: React.FC = () => {
                   onChange={(e) => setEditForm({ ...editForm, days: parseInt(e.target.value) })}
                 />
               </div>
+            </div>
+            <div className="form-row">
               <div className="form-group">
                 <label>Start date</label>
                 <input
