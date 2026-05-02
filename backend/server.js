@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// ========== IMPORT MODELS (required for mongoose to register them) ==========
+// ========== IMPORT MODELS ==========
 require('./models/Employe');
 require('./models/Absence');
 require('./models/Workload');
@@ -24,6 +24,8 @@ const workloadRoutes = require('./routes/workloadRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const importHistoryRoutes = require('./routes/importHistoryRoutes');
 const exportHistoryRoutes = require('./routes/exportHistoryRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const turnoverHistoryRoutes = require('./routes/turnoverHistoryRoutes'); // ADD THIS
 
 // ========== DATABASE CONNECTION ==========
 mongoose.connect('mongodb://127.0.0.1:27017/RH_management')
@@ -34,9 +36,11 @@ mongoose.connect('mongodb://127.0.0.1:27017/RH_management')
 app.use('/api/employees', employeRoutes);
 app.use('/api/absences', absenceRoutes);
 app.use('/api/workloads', workloadRoutes);
+app.use('/api/turnover-history', turnoverHistoryRoutes); // ADD THIS
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/import-history', importHistoryRoutes);
 app.use('/api/export-history', exportHistoryRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ========== TEST ROUTE ==========
 app.get('/api/test', (req, res) => {
