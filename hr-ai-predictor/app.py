@@ -53,6 +53,80 @@ def get_employee_by_id(employee_id):
         print(f"Error: {e}")
         return None
 
+def get_turnover_context(employee=None, department=None):
+    """Read imported turnover departure fields and summarize them for risk scoring."""
+    try:
+        query = {}
+        if department:
+            query["department"] = department
+
+        records = list(db.turnoverdepartures.find(query).sort("departureDate", -1).limit(200))
+        if not records and department:
+            records = list(db.turnoverdepartures.find({}).sort("departureDate", -1).limit(200))
+
+        matched_departure = None
+        if employee:
+            employee_name = f"{employee.get('prenom', '')} {employee.get('nom', '')}".strip().lower()
+            matched_departure = next(
+                (r for r in records if str(r.get("employeeName", "")).strip().lower() == employee_name),
+                None
+            )
+
+        def top_value(field):
+            counts = {}
+            for record in records:
+                value = record.get(field) or "Unknown"
+                counts[value] = counts.get(value, 0) + 1
+            if not counts:
+                return None, 0
+            value, count = max(counts.items(), key=lambda item: item[1])
+            return value, count
+
+        top_reason, top_reason_count = top_value("departureReason")
+        top_cause, top_cause_count = top_value("departureCause")
+        top_workforce_type, _ = top_value("workforceType")
+        top_college, _ = top_value("college")
+        top_organization_type, _ = top_value("organizationType")
+
+        return {
+            "departmentDepartureCount": len(records),
+            "topDepartureReason": top_reason,
+            "topDepartureReasonCount": top_reason_count,
+            "topDepartureCause": top_cause,
+            "topDepartureCauseCount": top_cause_count,
+            "topWorkforceType": top_workforce_type,
+            "topCollege": top_college,
+            "topOrganizationType": top_organization_type,
+            "matchedDeparture": {
+                "employeeName": matched_departure.get("employeeName"),
+                "position": matched_departure.get("position"),
+                "department": matched_departure.get("department"),
+                "hireDate": matched_departure.get("hireDate"),
+                "departureDate": matched_departure.get("departureDate"),
+                "seniority": matched_departure.get("seniority"),
+                "gender": matched_departure.get("gender"),
+                "organizationType": matched_departure.get("organizationType"),
+                "college": matched_departure.get("college"),
+                "workforceType": matched_departure.get("workforceType"),
+                "departureReason": matched_departure.get("departureReason"),
+                "departureCause": matched_departure.get("departureCause"),
+                "cumulative": matched_departure.get("cumulative")
+            } if matched_departure else None
+        }
+    except Exception as e:
+        print(f"Turnover context error: {e}")
+        return {
+            "departmentDepartureCount": 0,
+            "topDepartureReason": None,
+            "topDepartureReasonCount": 0,
+            "topDepartureCause": None,
+            "topDepartureCauseCount": 0,
+            "topWorkforceType": None,
+            "topCollege": None,
+            "topOrganizationType": None,
+            "matchedDeparture": None
+        }
+
 def get_employee_absence_history(employee_id):
     """Get chronological monthly absence values"""
     try:
@@ -116,7 +190,7 @@ def predict_absence_value(monthly_values):
     
     return predicted_days, trend, last_3
 
-def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days):
+def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days, turnover_context=None):
     """Calculate turnover risk score"""
     risk_score = 0
     factors = []
@@ -130,12 +204,28 @@ def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days):
     if absence_days > 5:
         risk_score += 10
         factors.append("Hausse des absences récentes")
+
+    turnover_context = turnover_context or {}
+    department_departures = turnover_context.get("departmentDepartureCount", 0)
+    if department_departures >= 5:
+        risk_score += 15
+        factors.append(f"Historique de départs élevé dans le département ({department_departures})")
+    elif department_departures >= 2:
+        risk_score += 8
+        factors.append(f"Départs récents dans le département ({department_departures})")
+
+    top_reason = turnover_context.get("topDepartureReason")
+    top_cause = turnover_context.get("topDepartureCause")
+    if top_reason and top_reason not in ["-", "Unknown"]:
+        factors.append(f"Motif dominant: {top_reason}")
+    if top_cause and top_cause not in ["-", "Unknown"]:
+        factors.append(f"Cause dominante: {top_cause}")
     
     risk_score = min(100, risk_score)
     
     if risk_score >= 50:
         risk_level = "High"
-        recommendation = "Plan d'action : redistribution des tâches, flexibilité horaire"
+        recommendation = "Plan d'action : redistribution des tâches, flexibilité horaire, entretien de rétention ciblé"
     elif risk_score >= 30:
         risk_level = "Medium"
         recommendation = "Surveillance active : évaluation des sources de stress"
@@ -227,9 +317,10 @@ def predict_turnover(employee_id):
             "startDate": {"$gte": three_months_ago}
         }))
         absence_days = sum(a.get("days", 0) for a in recent_absences)
+        turnover_context = get_turnover_context(emp, department)
         
         risk_score, risk_level, factors, recommendation = predict_turnover_risk_value(
-            weekly_hours, overtime_hours, absence_days
+            weekly_hours, overtime_hours, absence_days, turnover_context
         )
         
         return jsonify({
@@ -240,6 +331,7 @@ def predict_turnover(employee_id):
             "riskLevel": risk_level,
             "mainFactors": factors,
             "recommendation": recommendation,
+            "turnoverContext": turnover_context,
             "weeklyHours": round(weekly_hours),
             "overtimeHours": round(overtime_hours),
             "absenceDaysRecent": absence_days
@@ -311,10 +403,19 @@ def batch_predict():
             full_emp = get_employee_by_id(emp["id"])
             if full_emp:
                 # Turnover prediction
+                name_parts = emp["name"].split(" ") if emp["name"] else []
+                turnover_context = get_turnover_context(
+                    {
+                        "prenom": name_parts[0] if name_parts else "",
+                        "nom": " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+                    },
+                    full_emp["department"]
+                )
                 risk_score, risk_level, factors, recommendation = predict_turnover_risk_value(
                     full_emp["weeklyHours"],
                     full_emp["overtimeHours"],
-                    full_emp["absenceDaysRecent"]
+                    full_emp["absenceDaysRecent"],
+                    turnover_context
                 )
                 results["turnover"].append({
                     "employeeId": emp["id"],
@@ -323,7 +424,8 @@ def batch_predict():
                     "riskScore": risk_score,
                     "riskLevel": risk_level,
                     "mainFactors": factors,
-                    "recommendation": recommendation
+                    "recommendation": recommendation,
+                    "turnoverContext": turnover_context
                 })
                 if risk_level == "High":
                     results["summary"]["highRiskTurnover"] += 1
@@ -333,6 +435,7 @@ def batch_predict():
                 results["workload"].append({
                     "employeeId": emp["id"],
                     "employeeName": emp["name"],
+                    "department": full_emp["department"],
                     "overloadScore": overload_score,
                     "status": status,
                     "recommendation": recommendation

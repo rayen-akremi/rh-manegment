@@ -62,7 +62,8 @@ class HRPredictor:
         }
     
     def predict_turnover_risk(self, weekly_hours, overtime_hours, absence_days_recent, 
-                              performance_score, department, avg_dept_weekly=40):
+                              performance_score, department, avg_dept_weekly=40,
+                              turnover_context=None):
         """Predict employee turnover/resignation risk"""
         risk_score = 0
         factors = []
@@ -105,6 +106,22 @@ class HRPredictor:
             risk_score += 10
             factors.append("Charge supérieure à la moyenne du département")
         
+        turnover_context = turnover_context or {}
+        department_departures = turnover_context.get("departmentDepartureCount", 0)
+        if department_departures >= 5:
+            risk_score += 15
+            factors.append(f"Historique de departs eleve dans le departement ({department_departures})")
+        elif department_departures >= 2:
+            risk_score += 8
+            factors.append(f"Departs recents dans le departement ({department_departures})")
+
+        top_reason = turnover_context.get("topDepartureReason")
+        top_cause = turnover_context.get("topDepartureCause")
+        if top_reason and top_reason not in ["-", "Unknown"]:
+            factors.append(f"Motif dominant: {top_reason}")
+        if top_cause and top_cause not in ["-", "Unknown"]:
+            factors.append(f"Cause dominante: {top_cause}")
+
         risk_score = min(100, risk_score)
         
         if risk_score >= 70:
@@ -124,7 +141,8 @@ class HRPredictor:
             "riskScore": risk_score,
             "riskLevel": risk_level,
             "mainFactors": factors[:4],
-            "recommendation": recommendation
+            "recommendation": recommendation,
+            "turnoverContext": turnover_context
         }
     
     def predict_workload_overload(self, weekly_hours, overtime_hours):
@@ -202,7 +220,8 @@ class HRPredictor:
                 emp.get("absenceDaysRecent", 0),
                 emp.get("performanceScore", 75),
                 emp["department"],
-                avg_dept
+                avg_dept,
+                emp.get("turnoverContext")
             )
             results["turnover"].append({
                 "employeeId": emp["id"],

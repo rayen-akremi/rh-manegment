@@ -9,6 +9,7 @@ import WorkloadManagement from './components/WorkloadManagement';
 import AIPrediction from './components/AIPrediction';
 import ImportFile from './components/import';
 import ExportFile from './components/ExportFile';
+import Settings from './components/settings';
 import Turnover from './components/Turnover';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/import-file" element={<PrivateRoute><ImportFile /></PrivateRoute>} />
           <Route path="/export-file" element={<PrivateRoute><ExportFile /></PrivateRoute>} />
           <Route path="/turnover" element={<PrivateRoute><Turnover /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
           <Route path="/" element={<Navigate to="/login" />} />
         </Routes>
       </Router>

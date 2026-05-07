@@ -14,6 +14,7 @@ require('./models/Employe');
 require('./models/Absence');
 require('./models/Workload');
 require('./models/TurnoverHistory');
+require('./models/TurnoverDeparture');
 require('./models/ImportHistory');
 require('./models/ExportHistory');
 

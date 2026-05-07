@@ -19,6 +19,59 @@
   font-size: 0.9rem;
 }
 
+.turnover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.turnover-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.turnover-actions select,
+.turnover-actions .btn-import,
+.turnover-actions .btn-add-turnover {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+}
+
+.turnover-actions .btn-import {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.turnover-actions .btn-add-turnover {
+  cursor: pointer;
+  font-weight: 700;
+  background: #0f172a;
+  color: #fff;
+}
+
+.turnover-error,
+.turnover-loading {
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  color: #334155;
+}
+
+.turnover-error {
+  border-left: 4px solid #ef4444;
+  color: #991b1b;
+}
+
 /* KPI Cards */
 .kpi-grid {
   display: grid;
@@ -48,6 +101,12 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: #0f172a;
+}
+
+.kpi-value.compact {
+  font-size: 1rem;
+  line-height: 1.25;
+  min-height: 2.5rem;
 }
 .kpi-trend {
   font-size: 0.7rem;
@@ -196,6 +255,10 @@
   width: 100%;
   border-collapse: collapse;
 }
+
+.turnover-wide-table {
+  min-width: 1400px;
+}
 .registre-table th,
 .registre-table td {
   padding: 0.8rem;
@@ -206,6 +269,11 @@
   background: #f8fafc;
   font-weight: 600;
   color: #1e293b;
+}
+
+.empty-row {
+  color: #64748b;
+  text-align: center;
 }
 .action-icons {
   display: flex;
@@ -235,6 +303,110 @@
   background: #f1f5f9;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 1rem;
+}
+
+.turnover-modal {
+  width: min(980px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+
+.turnover-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.turnover-modal-header h2 {
+  margin: 0 0 0.25rem;
+  color: #0f172a;
+  font-size: 1.25rem;
+}
+
+.turnover-modal-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.turnover-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+
+.turnover-form-grid .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.turnover-form-grid label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.turnover-form-grid input {
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.btn-cancel,
+.btn-submit {
+  min-height: 40px;
+  border-radius: 8px;
+  padding: 0 1rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.btn-cancel {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.btn-submit {
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  color: #fff;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .turnover-page {
@@ -245,5 +417,13 @@
   .two-columns {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+  .turnover-header,
+  .turnover-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .turnover-form-grid {
+    grid-template-columns: 1fr;
   }
 }
