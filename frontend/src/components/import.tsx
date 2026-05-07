@@ -13,7 +13,7 @@ interface ColumnMapping {
   sourceColumn: string;
 }
 
-type DetectedFileType = 'turnover' | 'generic';
+type DetectedFileType = 'turnover' | 'monthlyRecap' | 'generic';
 
 const systemFields = [
   'Employee ID', 'Name', 'Department', 'Position', 'Email',
@@ -35,6 +35,22 @@ const turnoverFields = [
   'Motif de départ',
   'Cause de départ',
   'Cumul'
+];
+
+const monthlyRecapFields = [
+  'Matricule',
+  'Nom & Prénom',
+  'Régime',
+  'Département (New)',
+  "Type d'effectif",
+  'Genre',
+  "Date d'embauche",
+  'H. T',
+  '25 %',
+  '50 %',
+  '100 %',
+  'H. NUIT',
+  'ABS./jour'
 ];
 
 const normalize = (value: string) =>
@@ -88,6 +104,15 @@ const ImportFile: React.FC = () => {
     });
   };
 
+  const detectMonthlyRecapHeaderRow = (rows: any[][]) => {
+    const expected = monthlyRecapFields.map(normalize);
+    return rows.findIndex((row) => {
+      const rowHeaders = row.map((cell) => normalize(String(cell || '')));
+      const matches = expected.filter((field) => rowHeaders.includes(field)).length;
+      return rowHeaders.includes(normalize('Matricule')) && rowHeaders.includes(normalize('Nom & Prénom')) && matches >= 6;
+    });
+  };
+
   const rowsToObjects = (rows: any[][], headerIndex: number) => {
     const cols = rows[headerIndex].map((cell) => String(cell || '').trim()).filter(Boolean);
     const objects = rows.slice(headerIndex + 1)
@@ -105,7 +130,7 @@ const ImportFile: React.FC = () => {
 
   const autoMapColumns = (cols: string[], fileType: DetectedFileType) => {
     const newMapping: ColumnMapping[] = [];
-    const fields = fileType === 'turnover' ? turnoverFields : systemFields;
+    const fields = fileType === 'turnover' ? turnoverFields : fileType === 'monthlyRecap' ? monthlyRecapFields : systemFields;
 
     fields.forEach((systemField) => {
       const normalizedField = normalize(systemField);
@@ -148,6 +173,19 @@ const ImportFile: React.FC = () => {
       return;
     }
 
+    if (fileType === 'monthlyRecap') {
+      const missingHeaders = monthlyRecapFields.filter((field) =>
+        !cols.some((col) => normalize(col) === normalize(field))
+      );
+      if (missingHeaders.length) {
+        suggestions.push(`Colonnes récap manquantes : ${missingHeaders.join(', ')}`);
+      } else {
+        suggestions.push('Format Récap détecté : heures, majorations et absences/jour sont prêtes à être importées.');
+      }
+      setAiSuggestions(suggestions);
+      return;
+    }
+
     const names = rows.map((r) => r['Name'] || r['name']).filter(Boolean);
     const duplicates = names.filter((n, i) => names.indexOf(n) !== i);
     if (duplicates.length) suggestions.push(`Doublons possibles pour : ${[...new Set(duplicates)].join(', ')}`);
@@ -169,6 +207,9 @@ const ImportFile: React.FC = () => {
     const turnoverRows: RawRow[] = [];
     let turnoverHeaders: string[] = [];
     const detectedSheets: string[] = [];
+    const recapRows: RawRow[] = [];
+    let recapHeaders: string[] = [];
+    const recapSheets: string[] = [];
 
     for (const sheetName of workbook.SheetNames) {
       const sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
@@ -177,12 +218,32 @@ const ImportFile: React.FC = () => {
         raw: false
       }) as any[][];
       const foundHeader = detectHeaderRow(sheetRows);
+      const foundRecapHeader = detectMonthlyRecapHeaderRow(sheetRows);
+      if (foundRecapHeader >= 0) {
+        const { cols, objects } = rowsToObjects(sheetRows, foundRecapHeader);
+        if (!recapHeaders.length) recapHeaders = cols;
+        recapRows.push(...objects);
+        recapSheets.push(sheetName);
+        continue;
+      }
       if (foundHeader >= 0) {
         const { cols, objects } = rowsToObjects(sheetRows, foundHeader);
         if (!turnoverHeaders.length) turnoverHeaders = cols;
         turnoverRows.push(...objects);
         detectedSheets.push(sheetName);
       }
+    }
+
+    if (recapRows.length) {
+      setDetectedFileType('monthlyRecap');
+      setDetectedSheet(recapSheets.join(', '));
+      setDetectedRows(recapRows.length);
+      setHeaders(recapHeaders);
+      setDataPreview(recapRows.slice(0, 10));
+      autoMapColumns(recapHeaders, 'monthlyRecap');
+      validateData(recapRows);
+      runAIChecks(recapRows, recapHeaders, 'monthlyRecap');
+      return;
     }
 
     if (!turnoverRows.length) {
@@ -294,6 +355,31 @@ const ImportFile: React.FC = () => {
   const startImport = async () => {
     if (!file) return;
 
+    if (detectedFileType === 'monthlyRecap') {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        setUploading(true);
+        const response = await fetch('/api/monthly-recap/import', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Import failed');
+        setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Success', rows: result.imported }, ...mockHistory]);
+        localStorage.setItem('monthlyRecapLastImport', String(Date.now()));
+        window.dispatchEvent(new Event('monthly-recap-imported'));
+        alert(`${result.message}. Rows detected: ${result.detectedRows}.`);
+      } catch (err: any) {
+        setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Failed', rows: 0 }, ...mockHistory]);
+        alert(`Erreur import récap: ${err.message}`);
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
     if (detectedFileType !== 'turnover') {
       alert(`Import ${importType} démarré avec mapping: ${mapping.map((m) => `${m.systemField}<-${m.sourceColumn}`).join(', ')}\nPlanification: ${schedule || 'immédiate'}`);
       setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Success', rows: dataPreview.length }, ...mockHistory]);
@@ -375,7 +461,7 @@ const ImportFile: React.FC = () => {
               <div className="file-info">
                 <strong>{file.name}</strong> ({(file.size / 1024).toFixed(1)} KB)
                 {detectedSheet && <div>Sheet: {detectedSheet}</div>}
-                <div>Detected type: {detectedFileType === 'turnover' ? 'Turnover departures' : 'Generic import'}</div>
+                <div>Detected type: {detectedFileType === 'turnover' ? 'Turnover departures' : detectedFileType === 'monthlyRecap' ? 'Monthly recap' : 'Generic import'}</div>
                 {detectedRows > 0 && <div>Rows detected: {detectedRows}</div>}
                 {uploading && <progress value={uploadProgress} max="100" className="progress-bar" />}
               </div>

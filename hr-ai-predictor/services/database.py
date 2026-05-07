@@ -14,6 +14,15 @@ db = client[DATABASE_NAME]
 
 async def get_employee_by_id(employee_id: str):
     """Get employee details by ID"""
+    recap = await db.monthlyrecaps.find_one({"matricule": str(employee_id)})
+    if recap:
+        return {
+            "id": recap["matricule"],
+            "name": recap.get("employeeName", ""),
+            "department": recap.get("department", "Unknown"),
+            "source": "monthlyRecap"
+        }
+
     employee = await db.employes.find_one({"employee_id": employee_id})
     if not employee:
         return None
@@ -25,6 +34,10 @@ async def get_employee_by_id(employee_id: str):
 
 async def get_employee_absence_history(employee_id: str, months: int = 6):
     """Get absence history grouped by month"""
+    recap = await db.monthlyrecaps.find_one({"matricule": str(employee_id)})
+    if recap:
+        return [recap.get("absenceDays", 0)]
+
     cutoff_date = datetime.now() - timedelta(days=months * 30)
     
     absences = await db.absences.find({
@@ -45,6 +58,18 @@ async def get_employee_absence_history(employee_id: str, months: int = 6):
 
 async def get_employee_workload(employee_id: str):
     """Get employee workload data"""
+    recap = await db.monthlyrecaps.find_one({"matricule": str(employee_id)})
+    if recap:
+        overtime_hours = (
+            recap.get("overtime25", 0) +
+            recap.get("overtime50", 0) +
+            recap.get("overtime100", 0)
+        )
+        return {
+            "weekly_hours": round(recap.get("htHours", 0)),
+            "overtime_hours": round(overtime_hours)
+        }
+
     workloads = await db.workloads.find({"employee_id": employee_id}).to_list(length=100)
     
     if not workloads:
@@ -60,6 +85,10 @@ async def get_employee_workload(employee_id: str):
 
 async def get_recent_absences(employee_id: str):
     """Get total absence days in last 3 months"""
+    recap = await db.monthlyrecaps.find_one({"matricule": str(employee_id)})
+    if recap:
+        return recap.get("absenceDays", 0)
+
     three_months_ago = datetime.now() - timedelta(days=90)
     absences = await db.absences.find({
         "employee_id": employee_id,
@@ -87,6 +116,15 @@ async def get_department_average_weekly(employee_id: str):
 
 async def get_all_employees():
     """Get list of all employees"""
+    recap_rows = await db.monthlyrecaps.find({}).sort("importOrder", 1).to_list(length=5000)
+    if recap_rows:
+        return [{
+            "id": e["matricule"],
+            "name": e.get("employeeName", ""),
+            "department": e.get("department", "Unknown"),
+            "source": "monthlyRecap"
+        } for e in recap_rows]
+
     employees = await db.employes.find({}).to_list(length=1000)
     return [{
         "id": e["employee_id"],

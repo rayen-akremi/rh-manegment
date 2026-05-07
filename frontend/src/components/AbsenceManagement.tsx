@@ -14,7 +14,9 @@ interface AbsenceRecord {
   department: string;
   type: AbsenceType;
   days: number;
+  hours?: number;
   startDate: string;
+  fromRecap?: boolean;
 }
 
 interface Employee {
@@ -27,6 +29,7 @@ interface Employee {
 const AbsenceManagement: React.FC = () => {
   const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [recapAbsenceHours, setRecapAbsenceHours] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,9 +119,34 @@ const AbsenceManagement: React.FC = () => {
   const fetchAbsences = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/absences');
+      const [response, recapResponse] = await Promise.all([
+        fetch('/api/absences'),
+        fetch('/api/monthly-recap')
+      ]);
       if (!response.ok) throw new Error('Erreur chargement');
       const data = await response.json();
+      const recapRows = recapResponse.ok ? await recapResponse.json() : [];
+      if (recapRows.length) {
+        const recapAbsences: AbsenceRecord[] = recapRows.map((item: any) => ({
+          id: item._id || item.matricule,
+          employeeId: item.matricule || '',
+          employee: item.employeeName || 'Unknown',
+          department: item.department || 'Unknown',
+          type: 'Other',
+          days: item.absenceDays || 0,
+          hours: item.absenceHours || 0,
+          startDate: '',
+          fromRecap: true
+        }));
+
+        setRecapAbsenceHours(recapAbsences.reduce((sum, item) => sum + (item.hours || 0), 0));
+        setAbsences(recapAbsences);
+        setError('');
+        return;
+      }
+      if (recapResponse.ok) {
+        setRecapAbsenceHours(0);
+      }
       
       let absencesArray = [];
       if (Array.isArray(data)) {
@@ -136,6 +164,7 @@ const AbsenceManagement: React.FC = () => {
         department: item.department || 'Unknown',
         type: (item.type as AbsenceType) || 'Other',
         days: item.days || 0,
+        hours: (item.days || 0) * 8,
         startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
       }));
       
@@ -153,6 +182,16 @@ const AbsenceManagement: React.FC = () => {
   useEffect(() => {
     fetchEmployees();
     fetchAbsences();
+    const refresh = () => {
+      fetchEmployees();
+      fetchAbsences();
+    };
+    window.addEventListener('monthly-recap-imported', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('monthly-recap-imported', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   // Handle employee selection
@@ -270,14 +309,12 @@ const AbsenceManagement: React.FC = () => {
       alert('Aucune donnée à exporter');
       return;
     }
-    const headers = ['Employee ID', 'Employee', 'Department', 'Type', 'Days', 'Start Date'];
+    const headers = ['Employee ID', 'Employee', 'Department', 'ABS./jour'];
     const rows = absences.map(a => [
       a.employeeId || '',
       a.employee || '',
       a.department || '',
-      a.type || '',
       a.days || 0,
-      a.startDate || '',
     ]);
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -294,14 +331,15 @@ const AbsenceManagement: React.FC = () => {
     if (!curr.department) return acc;
     const existing = acc.find(a => a.department === curr.department);
     if (existing) {
-      existing.absences += (curr.days || 0);
+      existing.absences += (curr.hours || ((curr.days || 0) * 8));
     } else {
-      acc.push({ department: curr.department, absences: curr.days || 0 });
+      acc.push({ department: curr.department, absences: curr.hours || ((curr.days || 0) * 8) });
     }
     return acc;
   }, []);
 
   const totalAbsenceDays = absences.reduce((sum, a) => sum + (a.days || 0), 0);
+  const totalAbsenceHours = recapAbsenceHours || totalAbsenceDays * 8;
   const overallAbsenceRate = absences.length ? ((totalAbsenceDays / (absences.length * 30)) * 100).toFixed(1) : 0;
   const employeesMoreThan3Absences = new Set(absences.filter(a => (a.days || 0) > 3).map(a => a.employee)).size;
 
@@ -345,6 +383,11 @@ const AbsenceManagement: React.FC = () => {
             <div className="kpi-delta">vs last month</div>
           </div>
           <div className="kpi-card">
+            <div className="kpi-title">ABSENCE HOURS</div>
+            <div className="kpi-value">{totalAbsenceHours.toFixed(1)} h</div>
+            <div className="kpi-delta">ABS./jour x 8h</div>
+          </div>
+          <div className="kpi-card">
             <div className="kpi-title">&gt;3 ABSENCES (EMPLOYEES)</div>
             <div className="kpi-value">{employeesMoreThan3Absences}</div>
             <div className="kpi-delta">vs last month</div>
@@ -366,9 +409,9 @@ const AbsenceManagement: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="department" />
                 <YAxis />
-                <Tooltip formatter={(value) => `${value} days`} />
+                <Tooltip formatter={(value) => `${value} hours`} />
                 <Legend />
-                <Bar dataKey="absences" fill="#8884d8" name="Absences (days)" />
+                <Bar dataKey="absences" fill="#8884d8" name="Absences (hours)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -404,9 +447,7 @@ const AbsenceManagement: React.FC = () => {
                   <th>Employee ID</th>
                   <th>Employee</th>
                   <th>Department</th>
-                  <th>Type</th>
-                  <th>Days</th>
-                  <th>Start date</th>
+                  <th>ABS./jour</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -416,18 +457,22 @@ const AbsenceManagement: React.FC = () => {
                     <td>{rec.employeeId || '-'}</td>
                     <td>{rec.employee || '-'}</td>
                     <td>{rec.department || '-'}</td>
-                    <td>{rec.type || '-'}</td>
                     <td>{rec.days || 0}</td>
-                    <td>{rec.startDate || '-'}</td>
                     <td className="actions">
-                      <button className="edit-btn" onClick={() => handleEditClick(rec)}>✏️</button>
-                      <button className="delete-btn" onClick={() => handleDelete(rec.id)}>🗑️</button>
+                      {rec.fromRecap ? (
+                        <span className="record-count">Imported</span>
+                      ) : (
+                        <>
+                          <button className="edit-btn" onClick={() => handleEditClick(rec)}>✏️</button>
+                          <button className="delete-btn" onClick={() => handleDelete(rec.id)}>🗑️</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
                 {filteredAbsences.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="no-data">No absence records found.</td>
+                    <td colSpan={5} className="no-data">No absence records found.</td>
                   </tr>
                 )}
               </tbody>

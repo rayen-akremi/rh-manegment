@@ -47,6 +47,13 @@ const AIPrediction: React.FC = () => {
   // Fetch all predictions via batch endpoint
   useEffect(() => {
     fetchBatchPredictions();
+    const refresh = () => fetchBatchPredictions();
+    window.addEventListener('monthly-recap-imported', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('monthly-recap-imported', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   const fetchBatchPredictions = async () => {
@@ -171,8 +178,8 @@ const AIPrediction: React.FC = () => {
           ? `🔴 ${highRiskCount} employee(s) at high departure risk. Schedule retention meetings.`
           : '✅ No high departure risk detected.',
         avgOverload > 50 
-          ? `⚠️ Critical overload risk detected (${avgOverload}%). Review workload distribution.`
-          : `⚠️ Moderate overload risk detected (${avgOverload}%).`,
+          ? `⚠️ Critical overload risk detected (${avgOverload}%, ${criticalWorkload} critical cases). Review workload distribution.`
+          : `⚠️ Moderate overload risk detected (${avgOverload}%, ${criticalWorkload} critical cases).`,
         avgAbsenteeism > 30 
           ? `📊 High absenteeism risk (${avgAbsenteeism}%). Schedule wellness checks.`
           : `📊 Absenteeism risk at ${avgAbsenteeism}%. Continue monitoring.`,

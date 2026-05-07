@@ -10,11 +10,17 @@ type WorkloadStatus = 'Normal' | 'High' | 'Critical';
 
 interface EmployeeWorkload {
   id: string;
+  employeeId?: string;
   name: string;
   department: string;
   weeklyHours: number;
   overtimeHours: number;
+  overtime25?: number;
+  overtime50?: number;
+  overtime100?: number;
+  nightHours?: number;
   status: WorkloadStatus;
+  fromRecap?: boolean;
 }
 
 const WorkloadManagement: React.FC = () => {
@@ -47,9 +53,13 @@ const WorkloadManagement: React.FC = () => {
   const fetchWorkloads = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/workloads');
+      const [response, recapResponse] = await Promise.all([
+        fetch('/api/workloads'),
+        fetch('/api/monthly-recap')
+      ]);
       if (!response.ok) throw new Error('Erreur chargement');
       const data = await response.json();
+      const recapData = recapResponse.ok ? await recapResponse.json() : [];
       
       const formattedWorkloads: EmployeeWorkload[] = (data || []).map((item: any) => ({
         id: item.workload_id || item._id,
@@ -57,10 +67,35 @@ const WorkloadManagement: React.FC = () => {
         department: item.department || '',
         weeklyHours: item.weeklyHours || 0,
         overtimeHours: item.overtimeHours || 0,
+        overtime25: 0,
+        overtime50: 0,
+        overtime100: 0,
+        nightHours: 0,
         status: item.status || 'Normal'
       }));
+
+      const recapWorkloads: EmployeeWorkload[] = (recapData || []).map((item: any) => {
+        const overtimeHours = (item.overtime25 || 0) + (item.overtime50 || 0) + (item.overtime100 || 0);
+        let status: WorkloadStatus = 'Normal';
+        if ((item.htHours || 0) >= 180 || overtimeHours >= 40) status = 'Critical';
+        else if ((item.htHours || 0) >= 168 || overtimeHours >= 15) status = 'High';
+        return {
+          id: item._id || item.matricule,
+          employeeId: item.matricule,
+          name: item.employeeName || '',
+          department: item.department || '',
+          weeklyHours: item.htHours || 0,
+          overtimeHours,
+          overtime25: item.overtime25 || 0,
+          overtime50: item.overtime50 || 0,
+          overtime100: item.overtime100 || 0,
+          nightHours: item.nightHours || 0,
+          status,
+          fromRecap: true
+        };
+      });
       
-      setWorkloads(formattedWorkloads);
+      setWorkloads(recapWorkloads.length ? recapWorkloads : formattedWorkloads);
       setError('');
     } catch (err) {
       console.error('Error fetching workloads:', err);
@@ -73,6 +108,13 @@ const WorkloadManagement: React.FC = () => {
 
   useEffect(() => {
     fetchWorkloads();
+    const refresh = () => fetchWorkloads();
+    window.addEventListener('monthly-recap-imported', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('monthly-recap-imported', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   // ========== ADD WORKLOAD ==========
@@ -178,11 +220,15 @@ const WorkloadManagement: React.FC = () => {
       alert('Aucune donnée à exporter');
       return;
     }
-    const headers = ['Name', 'Department', 'Weekly Hours', 'Overtime Hours', 'Status'];
+    const headers = ['Name', 'Department', 'H. T', '25 %', '50 %', '100 %', 'H. NUIT', 'Total Overtime', 'Status'];
     const rows = workloads.map(w => [
       w.name || '',
       w.department || '',
       w.weeklyHours || 0,
+      w.overtime25 || 0,
+      w.overtime50 || 0,
+      w.overtime100 || 0,
+      w.nightHours || 0,
       w.overtimeHours || 0,
       w.status || ''
     ]);
@@ -313,8 +359,12 @@ const WorkloadManagement: React.FC = () => {
                 <tr>
                   <th>Name</th>
                   <th>Department</th>
-                  <th>Weekly hours</th>
-                  <th>Overtime hours</th>
+                  <th>H. T</th>
+                  <th>25 %</th>
+                  <th>50 %</th>
+                  <th>100 %</th>
+                  <th>H. NUIT</th>
+                  <th>Total overtime</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -325,6 +375,10 @@ const WorkloadManagement: React.FC = () => {
                     <td>{work.name}</td>
                     <td>{work.department}</td>
                     <td>{work.weeklyHours}</td>
+                    <td title="Overtime at +25% rate">{work.overtime25 || 0}</td>
+                    <td title="Overtime at +50% rate">{work.overtime50 || 0}</td>
+                    <td title="Overtime at +100% rate">{work.overtime100 || 0}</td>
+                    <td>{work.nightHours || 0}</td>
                     <td>{work.overtimeHours}</td>
                     <td>
                       <span className="status-badge" style={{backgroundColor: getStatusColor(work.status), color: 'white'}}>
@@ -332,14 +386,20 @@ const WorkloadManagement: React.FC = () => {
                       </span>
                     </td>
                     <td className="actions">
-                      <button className="edit-btn" onClick={() => handleEditClick(work)}>✏️</button>
-                      <button className="delete-btn" onClick={() => handleDelete(work.id)}>🗑️</button>
+                      {work.fromRecap ? (
+                        <span className="kpi-sub">Imported</span>
+                      ) : (
+                        <>
+                          <button className="edit-btn" onClick={() => handleEditClick(work)}>✏️</button>
+                          <button className="delete-btn" onClick={() => handleDelete(work.id)}>🗑️</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
                 {filteredWorkloads.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem' }}>
                       Aucune charge de travail trouvée.
                     </td>
                   </tr>

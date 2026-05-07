@@ -18,9 +18,52 @@ DATABASE_NAME = os.getenv("DATABASE_NAME", "RH_management")
 client = pymongo.MongoClient(MONGODB_URL)
 db = client[DATABASE_NAME]
 
+def get_recap_by_employee_id(employee_id):
+    """Get imported monthly recap row by matricule."""
+    try:
+        return db.monthlyrecaps.find_one({"matricule": str(employee_id)})
+    except Exception as e:
+        print(f"Recap lookup error: {e}")
+        return None
+
+def get_recap_overtime_hours(recap):
+    return (
+        float(recap.get("overtime25", 0) or 0) +
+        float(recap.get("overtime50", 0) or 0) +
+        float(recap.get("overtime100", 0) or 0)
+    )
+
 def get_employee_by_id(employee_id):
     """Get employee details"""
     try:
+        recap = get_recap_by_employee_id(employee_id)
+        if recap:
+            overtime_hours = get_recap_overtime_hours(recap)
+            return {
+                "id": recap.get("matricule"),
+                "name": recap.get("employeeName", ""),
+                "department": recap.get("department", "Unknown"),
+                "weeklyHours": round(float(recap.get("htHours", 0) or 0), 1),
+                "overtimeHours": round(overtime_hours, 1),
+                "absenceDaysRecent": float(recap.get("absenceDays", 0) or 0),
+                "absenceHoursRecent": float(recap.get("absenceHours", 0) or 0),
+                "performanceScore": 75,
+                "source": "monthlyRecap",
+                "recap": {
+                    "regime": recap.get("regime"),
+                    "workforceType": recap.get("workforceType"),
+                    "gender": recap.get("gender"),
+                    "hireDate": recap.get("hireDate"),
+                    "htHours": recap.get("htHours", 0),
+                    "overtime25": recap.get("overtime25", 0),
+                    "overtime50": recap.get("overtime50", 0),
+                    "overtime100": recap.get("overtime100", 0),
+                    "nightHours": recap.get("nightHours", 0),
+                    "absenceDays": recap.get("absenceDays", 0),
+                    "absenceHours": recap.get("absenceHours", 0)
+                }
+            }
+
         emp = db.employes.find_one({"employee_id": employee_id})
         if not emp:
             return None
@@ -130,6 +173,10 @@ def get_turnover_context(employee=None, department=None):
 def get_employee_absence_history(employee_id):
     """Get chronological monthly absence values"""
     try:
+        recap = get_recap_by_employee_id(employee_id)
+        if recap:
+            return [float(recap.get("absenceDays", 0) or 0)]
+
         absences = list(db.absences.find({"employee_id": employee_id}).sort("startDate", 1))
         if not absences:
             return []
@@ -150,6 +197,15 @@ def get_employee_absence_history(employee_id):
 def get_all_employees():
     """Get list of all employees"""
     try:
+        recap_rows = list(db.monthlyrecaps.find({}).sort("importOrder", 1))
+        if recap_rows:
+            return [{
+                "id": e.get("matricule"),
+                "name": e.get("employeeName", ""),
+                "department": e.get("department", "Unknown"),
+                "source": "monthlyRecap"
+            } for e in recap_rows]
+
         employees = list(db.employes.find({}))
         return [{
             "id": e["employee_id"],
@@ -190,17 +246,31 @@ def predict_absence_value(monthly_values):
     
     return predicted_days, trend, last_3
 
-def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days, turnover_context=None):
+def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days, turnover_context=None, source="workload"):
     """Calculate turnover risk score"""
     risk_score = 0
     factors = []
     
-    if weekly_hours > 48:
-        risk_score += 25
-        factors.append("Heures hebdomadaires élevées (>48h)")
-    if overtime_hours > 15:
-        risk_score += 20
-        factors.append("Heures supplémentaires importantes (>15h/semaine)")
+    if source == "monthlyRecap":
+        if weekly_hours > 190:
+            risk_score += 25
+            factors.append("H. T mensuelles très élevées (>190h)")
+        elif weekly_hours > 176:
+            risk_score += 15
+            factors.append("H. T mensuelles élevées (>176h)")
+        if overtime_hours > 40:
+            risk_score += 25
+            factors.append("Heures majorées très importantes (>40h)")
+        elif overtime_hours > 15:
+            risk_score += 15
+            factors.append("Heures majorées importantes (>15h)")
+    else:
+        if weekly_hours > 48:
+            risk_score += 25
+            factors.append("Heures hebdomadaires élevées (>48h)")
+        if overtime_hours > 15:
+            risk_score += 20
+            factors.append("Heures supplémentaires importantes (>15h/semaine)")
     if absence_days > 5:
         risk_score += 10
         factors.append("Hausse des absences récentes")
@@ -235,8 +305,18 @@ def predict_turnover_risk_value(weekly_hours, overtime_hours, absence_days, turn
     
     return risk_score, risk_level, factors, recommendation
 
-def predict_workload_value(weekly_hours):
+def predict_workload_value(weekly_hours, overtime_hours=0, source="workload"):
     """Calculate workload overload score"""
+    if source == "monthlyRecap":
+        if weekly_hours > 190 or overtime_hours > 40:
+            return 85, "Critical", "URGENT : volume mensuel ou heures supplémentaires très élevé"
+        elif weekly_hours > 176 or overtime_hours > 20:
+            return 65, "High", "Évaluer la répartition des tâches et les heures majorées"
+        elif weekly_hours > 168 or overtime_hours > 8:
+            return 40, "Medium", "Surveiller les heures majorées et H. NUIT"
+        else:
+            return 20, "Normal", "Charge mensuelle équilibrée"
+
     if weekly_hours > 48:
         return 65, "High", "Évaluer la répartition des tâches, discuter des priorités"
     elif weekly_hours > 45:
@@ -260,12 +340,28 @@ def debug(employee_id):
 @app.route('/predict/absence/<employee_id>', methods=['POST'])
 def predict_absence(employee_id):
     try:
-        emp = db.employes.find_one({"employee_id": employee_id})
-        if not emp:
+        full_emp = get_employee_by_id(employee_id)
+        if not full_emp:
             return jsonify({"error": "Employee not found"}), 404
         
-        name = f"{emp.get('prenom', '')} {emp.get('nom', '')}".strip()
+        name = full_emp["name"]
         monthly_values = get_employee_absence_history(employee_id)
+        if full_emp.get("source") == "monthlyRecap":
+            absence_days = float(full_emp.get("absenceDaysRecent", 0) or 0)
+            predicted_rate = min(100, round((absence_days / 30) * 100))
+            return jsonify({
+                "employeeId": employee_id,
+                "employeeName": name,
+                "predictedAbsenceDays": absence_days,
+                "predictedAbsenceRate": predicted_rate,
+                "confidenceLow": max(0, round(absence_days * 0.8, 1)),
+                "confidenceHigh": round(absence_days * 1.2, 1),
+                "trend": "imported",
+                "historicalData": monthly_values,
+                "allMonthlyData": monthly_values,
+                "absenceHours": full_emp.get("absenceHoursRecent", 0),
+                "source": "monthlyRecap"
+            })
         
         if len(monthly_values) < 3:
             return jsonify({
@@ -300,27 +396,26 @@ def predict_absence(employee_id):
 @app.route('/predict/turnover/<employee_id>', methods=['POST'])
 def predict_turnover(employee_id):
     try:
-        emp = db.employes.find_one({"employee_id": employee_id})
-        if not emp:
+        full_emp = get_employee_by_id(employee_id)
+        if not full_emp:
             return jsonify({"error": "Employee not found"}), 404
         
-        name = f"{emp.get('prenom', '')} {emp.get('nom', '')}".strip()
-        department = emp.get("departement", "Unknown")
-        
-        workloads = list(db.workloads.find({"employee_id": employee_id}))
-        weekly_hours = sum(w.get("weeklyHours", 40) for w in workloads) / len(workloads) if workloads else 40
-        overtime_hours = sum(w.get("overtimeHours", 0) for w in workloads) / len(workloads) if workloads else 0
-        
-        three_months_ago = datetime.now() - timedelta(days=90)
-        recent_absences = list(db.absences.find({
-            "employee_id": employee_id,
-            "startDate": {"$gte": three_months_ago}
-        }))
-        absence_days = sum(a.get("days", 0) for a in recent_absences)
-        turnover_context = get_turnover_context(emp, department)
+        name = full_emp["name"]
+        department = full_emp["department"]
+        weekly_hours = full_emp["weeklyHours"]
+        overtime_hours = full_emp["overtimeHours"]
+        absence_days = full_emp["absenceDaysRecent"]
+        name_parts = name.split(" ") if name else []
+        turnover_context = get_turnover_context(
+            {
+                "prenom": name_parts[0] if name_parts else "",
+                "nom": " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+            },
+            department
+        )
         
         risk_score, risk_level, factors, recommendation = predict_turnover_risk_value(
-            weekly_hours, overtime_hours, absence_days, turnover_context
+            weekly_hours, overtime_hours, absence_days, turnover_context, full_emp.get("source", "workload")
         )
         
         return jsonify({
@@ -334,7 +429,9 @@ def predict_turnover(employee_id):
             "turnoverContext": turnover_context,
             "weeklyHours": round(weekly_hours),
             "overtimeHours": round(overtime_hours),
-            "absenceDaysRecent": absence_days
+            "absenceDaysRecent": absence_days,
+            "recap": full_emp.get("recap"),
+            "source": full_emp.get("source", "legacy")
         })
         
     except Exception as e:
@@ -343,26 +440,31 @@ def predict_turnover(employee_id):
 @app.route('/predict/workload/<employee_id>', methods=['POST'])
 def predict_workload(employee_id):
     try:
-        emp = db.employes.find_one({"employee_id": employee_id})
-        if not emp:
+        full_emp = get_employee_by_id(employee_id)
+        if not full_emp:
             return jsonify({"error": "Employee not found"}), 404
         
-        name = f"{emp.get('prenom', '')} {emp.get('nom', '')}".strip()
+        name = full_emp["name"]
+        weekly_hours = full_emp["weeklyHours"]
+        overtime_hours = full_emp["overtimeHours"]
         
-        workloads = list(db.workloads.find({"employee_id": employee_id}))
-        weekly_hours = sum(w.get("weeklyHours", 40) for w in workloads) / len(workloads) if workloads else 40
-        overtime_hours = sum(w.get("overtimeHours", 0) for w in workloads) / len(workloads) if workloads else 0
-        
-        overload_score, status, recommendation = predict_workload_value(weekly_hours)
+        overload_score, status, recommendation = predict_workload_value(
+            weekly_hours,
+            overtime_hours,
+            full_emp.get("source", "workload")
+        )
         
         return jsonify({
             "employeeId": employee_id,
             "employeeName": name,
+            "department": full_emp["department"],
             "overloadScore": overload_score,
             "status": status,
             "recommendation": recommendation,
             "weeklyHours": round(weekly_hours),
-            "overtimeHours": round(overtime_hours)
+            "overtimeHours": round(overtime_hours),
+            "recap": full_emp.get("recap"),
+            "source": full_emp.get("source", "legacy")
         })
         
     except Exception as e:
@@ -387,7 +489,20 @@ def batch_predict():
         for emp in employees:
             # Absence prediction
             monthly_values = get_employee_absence_history(emp["id"])
-            if len(monthly_values) >= 3:
+            full_emp = get_employee_by_id(emp["id"])
+            if full_emp and full_emp.get("source") == "monthlyRecap":
+                absence_days = float(full_emp.get("absenceDaysRecent", 0) or 0)
+                results["absences"].append({
+                    "employeeId": emp["id"],
+                    "employeeName": emp["name"],
+                    "predictedAbsenceDays": absence_days,
+                    "predictedAbsenceRate": min(100, round((absence_days / 30) * 100)),
+                    "trend": "imported",
+                    "historicalData": monthly_values,
+                    "absenceHours": full_emp.get("absenceHoursRecent", 0),
+                    "source": "monthlyRecap"
+                })
+            elif len(monthly_values) >= 3:
                 predicted_days, trend, last_3 = predict_absence_value(monthly_values)
                 predicted_rate = min(100, round((predicted_days / 30) * 100))
                 results["absences"].append({
@@ -400,7 +515,6 @@ def batch_predict():
                 })
             
             # Get full employee data
-            full_emp = get_employee_by_id(emp["id"])
             if full_emp:
                 # Turnover prediction
                 name_parts = emp["name"].split(" ") if emp["name"] else []
@@ -415,7 +529,8 @@ def batch_predict():
                     full_emp["weeklyHours"],
                     full_emp["overtimeHours"],
                     full_emp["absenceDaysRecent"],
-                    turnover_context
+                    turnover_context,
+                    full_emp.get("source", "workload")
                 )
                 results["turnover"].append({
                     "employeeId": emp["id"],
@@ -425,20 +540,30 @@ def batch_predict():
                     "riskLevel": risk_level,
                     "mainFactors": factors,
                     "recommendation": recommendation,
-                    "turnoverContext": turnover_context
+                    "turnoverContext": turnover_context,
+                    "source": full_emp.get("source", "legacy"),
+                    "recap": full_emp.get("recap")
                 })
                 if risk_level == "High":
                     results["summary"]["highRiskTurnover"] += 1
                 
                 # Workload prediction
-                overload_score, status, recommendation = predict_workload_value(full_emp["weeklyHours"])
+                overload_score, status, recommendation = predict_workload_value(
+                    full_emp["weeklyHours"],
+                    full_emp["overtimeHours"],
+                    full_emp.get("source", "workload")
+                )
                 results["workload"].append({
                     "employeeId": emp["id"],
                     "employeeName": emp["name"],
                     "department": full_emp["department"],
                     "overloadScore": overload_score,
                     "status": status,
-                    "recommendation": recommendation
+                    "recommendation": recommendation,
+                    "weeklyHours": full_emp["weeklyHours"],
+                    "overtimeHours": full_emp["overtimeHours"],
+                    "source": full_emp.get("source", "legacy"),
+                    "recap": full_emp.get("recap")
                 })
                 if status == "Critical":
                     results["summary"]["criticalWorkload"] += 1

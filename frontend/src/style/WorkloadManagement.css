@@ -120,6 +120,7 @@
 }
 .workload-table {
   width: 100%;
+  min-width: 1050px;
   border-collapse: collapse;
 }
 .workload-table th, .workload-table td {

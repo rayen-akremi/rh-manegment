@@ -15,6 +15,7 @@ require('./models/Absence');
 require('./models/Workload');
 require('./models/TurnoverHistory');
 require('./models/TurnoverDeparture');
+require('./models/MonthlyRecap');
 require('./models/ImportHistory');
 require('./models/ExportHistory');
 
@@ -27,6 +28,7 @@ const importHistoryRoutes = require('./routes/importHistoryRoutes');
 const exportHistoryRoutes = require('./routes/exportHistoryRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const turnoverHistoryRoutes = require('./routes/turnoverHistoryRoutes'); // ADD THIS
+const monthlyRecapRoutes = require('./routes/monthlyRecapRoutes');
 
 // ========== DATABASE CONNECTION ==========
 mongoose.connect('mongodb://127.0.0.1:27017/RH_management')
@@ -38,6 +40,7 @@ app.use('/api/employees', employeRoutes);
 app.use('/api/absences', absenceRoutes);
 app.use('/api/workloads', workloadRoutes);
 app.use('/api/turnover-history', turnoverHistoryRoutes); // ADD THIS
+app.use('/api/monthly-recap', monthlyRecapRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/import-history', importHistoryRoutes);
 app.use('/api/export-history', exportHistoryRoutes);

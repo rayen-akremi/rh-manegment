@@ -178,6 +178,7 @@
 
 .employee-table {
   width: 100%;
+  min-width: 1350px;
   border-collapse: collapse;
 }
 

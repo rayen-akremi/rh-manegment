@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import Navbar from './Navbar';
 import '../style/Employee.css';
 
@@ -15,6 +14,17 @@ interface EmployeeData {
   seniority: number;
   status: EmployeeStatus;
   joinDate?: string;
+  regime?: string;
+  workforceType?: string;
+  gender?: string;
+  htHours?: number;
+  overtime25?: number;
+  overtime50?: number;
+  overtime100?: number;
+  nightHours?: number;
+  absenceDays?: number;
+  absenceHours?: number;
+  fromRecap?: boolean;
 }
 
 const Employee: React.FC = () => {
@@ -55,9 +65,13 @@ const Employee: React.FC = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/employees');
+      const [response, recapResponse] = await Promise.all([
+        fetch('/api/employees'),
+        fetch('/api/monthly-recap')
+      ]);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      const recapData = recapResponse.ok ? await recapResponse.json() : [];
       
       const formatted: EmployeeData[] = (data || []).map((emp: any) => ({
         id: emp.employee_id || '',
@@ -71,7 +85,30 @@ const Employee: React.FC = () => {
         joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : '',
       }));
       
-      setEmployees(formatted);
+      const recapEmployees: EmployeeData[] = (recapData || []).map((item: any) => ({
+        id: item.matricule || '',
+        matricule: item.matricule || '',
+        name: item.employeeName || '',
+        department: item.department || '',
+        position: item.regime || '',
+        age: 0,
+        seniority: 0,
+        status: 'Actif',
+        joinDate: item.hireDate ? item.hireDate.split('T')[0] : '',
+        regime: item.regime || '',
+        workforceType: item.workforceType || '',
+        gender: item.gender || '',
+        htHours: item.htHours || 0,
+        overtime25: item.overtime25 || 0,
+        overtime50: item.overtime50 || 0,
+        overtime100: item.overtime100 || 0,
+        nightHours: item.nightHours || 0,
+        absenceDays: item.absenceDays || 0,
+        absenceHours: item.absenceHours || 0,
+        fromRecap: true
+      }));
+
+      setEmployees(recapEmployees.length ? recapEmployees : formatted);
       setError('');
     } catch (err) {
       console.error(err);
@@ -84,6 +121,13 @@ const Employee: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
+    const refresh = () => fetchEmployees();
+    window.addEventListener('monthly-recap-imported', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('monthly-recap-imported', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   // ========== ADD EMPLOYEE ==========
@@ -201,12 +245,14 @@ const Employee: React.FC = () => {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await fetch('/api/employees/import', {
+      const res = await fetch('/api/monthly-recap/import', {
         method: 'POST',
         body: formData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
+      localStorage.setItem('monthlyRecapLastImport', String(Date.now()));
+      window.dispatchEvent(new Event('monthly-recap-imported'));
       alert(data.message);
       await fetchEmployees();
     } catch (err: any) {
@@ -218,8 +264,8 @@ const Employee: React.FC = () => {
   // ========== STATISTICS ==========
   const total = employees.length;
   const actifs = employees.filter(e => e.status === 'Actif').length;
-  const enCongé = employees.filter(e => e.status === 'En congé').length;
-  const absent = employees.filter(e => e.status === 'Absent').length;
+  const totalHtHours = employees.reduce((sum, e) => sum + (e.htHours || 0), 0);
+  const totalNightHours = employees.reduce((sum, e) => sum + (e.nightHours || 0), 0);
 
   // ========== SAFE FILTER ==========
   const filteredEmployees = employees.filter(emp => {
@@ -248,8 +294,8 @@ const Employee: React.FC = () => {
         <div className="stats-cards">
           <div className="stat-card"><div className="stat-value">{total}</div><div className="stat-label">TOTAL</div></div>
           <div className="stat-card"><div className="stat-value">{actifs}</div><div className="stat-label">ACTIFS</div></div>
-          <div className="stat-card"><div className="stat-value">{enCongé}</div><div className="stat-label">EN CONGÉ</div></div>
-          <div className="stat-card"><div className="stat-value">{absent}</div><div className="stat-label">ABSENT</div></div>
+          <div className="stat-card"><div className="stat-value">{totalHtHours.toFixed(1)}</div><div className="stat-label">H. T</div></div>
+          <div className="stat-card"><div className="stat-value">{totalNightHours.toFixed(1)}</div><div className="stat-label">H. NUIT</div></div>
         </div>
 
         <div className="toolbar">
@@ -265,8 +311,8 @@ const Employee: React.FC = () => {
               <option>Tous les statuts</option><option>Actif</option><option>En congé</option><option>Absent</option>
             </select>
             <label className="btn-import">
-              📂 Importer Excel
-              <input type="file" accept=".xlsx, .xls" onChange={handleImportExcel} hidden />
+              📂 Importer Récap
+              <input type="file" accept=".xlsx,.xls,.ods" onChange={handleImportExcel} hidden />
             </label>
             <button className="btn-add" onClick={() => setShowAddModal(true)}>Ajouter</button>
           </div>
@@ -277,7 +323,18 @@ const Employee: React.FC = () => {
             <thead>
               <tr>
                 <th>Employé</th>
+                <th>Régime</th>
                 <th>Département</th>
+                <th>Type d'effectif</th>
+                <th>Genre</th>
+                <th>Date d'embauche</th>
+                <th>H. T</th>
+                <th>25 %</th>
+                <th>50 %</th>
+                <th>100 %</th>
+                <th>H. NUIT</th>
+                <th>ABS./jour</th>
+                <th>Abs. hours</th>
                 <th>Matricule</th>
                 <th>Actions</th>
               </tr>
@@ -288,19 +345,36 @@ const Employee: React.FC = () => {
                   <td className="employee-info">
                     <div className="employee-name">{emp.name}</div>
                     <div className="employee-details">{emp.id} - {emp.position}</div>
-                    <div className="employee-details">{emp.age} ans</div>
+                    {!emp.fromRecap && <div className="employee-details">{emp.age} ans</div>}
                   </td>
+                  <td>{emp.regime || emp.position || '-'}</td>
                   <td>{emp.department}</td>
+                  <td>{emp.workforceType || '-'}</td>
+                  <td>{emp.gender || '-'}</td>
+                  <td>{emp.joinDate || '-'}</td>
+                  <td>{emp.htHours || 0}</td>
+                  <td>{emp.overtime25 || 0}</td>
+                  <td>{emp.overtime50 || 0}</td>
+                  <td>{emp.overtime100 || 0}</td>
+                  <td>{emp.nightHours || 0}</td>
+                  <td>{emp.absenceDays || 0}</td>
+                  <td>{emp.absenceHours || 0}</td>
                   <td>{emp.matricule}</td>
                   <td>
-                    <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
-                    <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id)}>🗑️</button>
+                    {emp.fromRecap ? (
+                      <span className="employee-details">Imported</span>
+                    ) : (
+                      <>
+                        <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
+                        <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id)}>🗑️</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
               {filteredEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>Aucun employé trouvé.</td>
+                  <td colSpan={15} style={{ textAlign: 'center', padding: '2rem' }}>Aucun employé trouvé.</td>
                 </tr>
               )}
             </tbody>
