@@ -178,4 +178,30 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 });
 
+router.delete('/:matricule', async (req, res) => {
+  try {
+    const { matricule } = req.params;
+    const result = await MonthlyRecap.findOneAndDelete({ matricule });
+    if (!result) {
+      return res.status(404).json({ message: 'Employé non trouvé' });
+    }
+    res.json({ message: 'Employé supprimé' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/bulk/delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'IDs manquants' });
+    }
+    const result = await MonthlyRecap.deleteMany({ matricule: { $in: ids } });
+    res.json({ message: `${result.deletedCount} employé(s) supprimé(s)` });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

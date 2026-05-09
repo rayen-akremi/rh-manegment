@@ -36,6 +36,8 @@ const Employee: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeData | null>(null);
+  const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [newEmployee, setNewEmployee] = useState({
     prenom: '',
@@ -47,6 +49,16 @@ const Employee: React.FC = () => {
     status: 'Actif' as EmployeeStatus,
     age: 25,
     joinDate: '',
+    regime: '',
+    workforceType: '',
+    gender: '',
+    htHours: 0,
+    overtime25: 0,
+    overtime50: 0,
+    overtime100: 0,
+    nightHours: 0,
+    absenceDays: 0,
+    absenceHours: 0,
   });
 
   const [editForm, setEditForm] = useState({
@@ -59,6 +71,16 @@ const Employee: React.FC = () => {
     status: 'Actif' as EmployeeStatus,
     age: 25,
     joinDate: '',
+    regime: '',
+    workforceType: '',
+    gender: '',
+    htHours: 0,
+    overtime25: 0,
+    overtime50: 0,
+    overtime100: 0,
+    nightHours: 0,
+    absenceDays: 0,
+    absenceHours: 0,
   });
 
   // ========== FETCH EMPLOYEES ==========
@@ -83,6 +105,16 @@ const Employee: React.FC = () => {
         seniority: 0,
         status: emp.status === 'Actif' ? 'Actif' : (emp.status === 'En congé' ? 'En congé' : 'Absent'),
         joinDate: emp.joinDate ? emp.joinDate.split('T')[0] : '',
+        regime: emp.regime || '',
+        workforceType: emp.workforceType || '',
+        gender: emp.gender || '',
+        htHours: emp.htHours || 0,
+        overtime25: emp.overtime25 || 0,
+        overtime50: emp.overtime50 || 0,
+        overtime100: emp.overtime100 || 0,
+        nightHours: emp.nightHours || 0,
+        absenceDays: emp.absenceDays || 0,
+        absenceHours: emp.absenceHours || 0,
       }));
       
       const recapEmployees: EmployeeData[] = (recapData || []).map((item: any) => ({
@@ -152,6 +184,16 @@ const Employee: React.FC = () => {
       poste: newEmployee.position,
       status: newEmployee.status,
       joinDate: newEmployee.joinDate ? new Date(newEmployee.joinDate) : undefined,
+      regime: newEmployee.regime,
+      workforceType: newEmployee.workforceType,
+      gender: newEmployee.gender,
+      htHours: newEmployee.htHours,
+      overtime25: newEmployee.overtime25,
+      overtime50: newEmployee.overtime50,
+      overtime100: newEmployee.overtime100,
+      nightHours: newEmployee.nightHours,
+      absenceDays: newEmployee.absenceDays,
+      absenceHours: newEmployee.absenceHours,
     };
 
     try {
@@ -166,7 +208,8 @@ const Employee: React.FC = () => {
       setShowAddModal(false);
       setNewEmployee({
         prenom: '', nom: '', id: '', matricule: '', position: '', department: '', status: 'Actif',
-        age: 25, joinDate: '',
+        age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, overtime25: 0, 
+        overtime50: 0, overtime100: 0, nightHours: 0, absenceDays: 0, absenceHours: 0,
       });
     } catch (err: any) {
       alert(`Erreur lors de l'ajout: ${err.message}`);
@@ -206,6 +249,16 @@ const Employee: React.FC = () => {
       poste: editForm.position,
       status: editForm.status,
       joinDate: editForm.joinDate ? new Date(editForm.joinDate) : undefined,
+      regime: editForm.regime,
+      workforceType: editForm.workforceType,
+      gender: editForm.gender,
+      htHours: editForm.htHours,
+      overtime25: editForm.overtime25,
+      overtime50: editForm.overtime50,
+      overtime100: editForm.overtime100,
+      nightHours: editForm.nightHours,
+      absenceDays: editForm.absenceDays,
+      absenceHours: editForm.absenceHours,
     };
     
     try {
@@ -227,12 +280,86 @@ const Employee: React.FC = () => {
   };
 
   // ========== DELETE EMPLOYEE ==========
-  const handleDeleteEmployee = async (id: string) => {
+  const handleDeleteEmployee = async (id: string, fromRecap: boolean = false) => {
     if (!window.confirm('Supprimer cet employé ?')) return;
     try {
-      const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      const endpoint = fromRecap ? `/api/monthly-recap/${id}` : `/api/employees/${id}`;
+      const res = await fetch(endpoint, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       await fetchEmployees();
+    } catch (err) {
+      alert('Erreur lors de la suppression');
+    }
+  };
+
+  // ========== DELETE WITH SELECTION ==========
+  const toggleSelectEmployee = (id: string, isImported: boolean) => {
+    const key = `${isImported ? 'recap' : 'emp'}:${id}`;
+    const newSelected = new Set(selectedForDelete);
+    if (newSelected.has(key)) {
+      newSelected.delete(key);
+    } else {
+      newSelected.add(key);
+    }
+    setSelectedForDelete(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedForDelete.size === filteredEmployees.length) {
+      setSelectedForDelete(new Set());
+    } else {
+      const allIds = new Set(filteredEmployees.map(e => `${e.fromRecap ? 'recap' : 'emp'}:${e.id}`));
+      setSelectedForDelete(allIds);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedForDelete.size === 0) {
+      alert('Sélectionnez au moins un employé');
+      return;
+    }
+    if (!window.confirm(`Supprimer ${selectedForDelete.size} employé(s) ?`)) return;
+
+    const selectedArray = Array.from(selectedForDelete);
+    const regularIds = selectedArray
+      .filter(id => id.startsWith('emp:'))
+      .map(id => id.replace('emp:', ''));
+    const importedIds = selectedArray
+      .filter(id => id.startsWith('recap:'))
+      .map(id => id.replace('recap:', ''));
+
+    try {
+      const promises: Promise<Response>[] = [];
+      
+      if (regularIds.length > 0) {
+        promises.push(
+          fetch('/api/employees/bulk/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: regularIds }),
+          })
+        );
+      }
+      
+      if (importedIds.length > 0) {
+        promises.push(
+          fetch('/api/monthly-recap/bulk/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: importedIds }),
+          })
+        );
+      }
+
+      const responses = await Promise.all(promises);
+      for (const res of responses) {
+        if (!res.ok) throw new Error('Erreur lors de la suppression');
+      }
+      
+      setSelectedForDelete(new Set());
+      setShowDeleteConfirm(false);
+      await fetchEmployees();
+      alert('Suppression effectuée avec succès');
     } catch (err) {
       alert('Erreur lors de la suppression');
     }
@@ -315,6 +442,11 @@ const Employee: React.FC = () => {
               <input type="file" accept=".xlsx,.xls,.ods" onChange={handleImportExcel} hidden />
             </label>
             <button className="btn-add" onClick={() => setShowAddModal(true)}>Ajouter</button>
+            {selectedForDelete.size > 0 && (
+              <button className="btn-delete-bulk" onClick={() => setShowDeleteConfirm(true)}>
+                Supprimer ({selectedForDelete.size})
+              </button>
+            )}
           </div>
         </div>
 
@@ -322,6 +454,13 @@ const Employee: React.FC = () => {
           <table className="employee-table">
             <thead>
               <tr>
+                <th style={{ width: '40px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedForDelete.size === filteredEmployees.length && filteredEmployees.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th>Employé</th>
                 <th>Régime</th>
                 <th>Département</th>
@@ -342,6 +481,13 @@ const Employee: React.FC = () => {
             <tbody>
               {filteredEmployees.map((emp) => (
                 <tr key={emp.id}>
+                  <td style={{ width: '40px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedForDelete.has(`${emp.fromRecap ? 'recap' : 'emp'}:${emp.id}`)}
+                      onChange={() => toggleSelectEmployee(emp.id, emp.fromRecap || false)}
+                    />
+                  </td>
                   <td className="employee-info">
                     <div className="employee-name">{emp.name}</div>
                     <div className="employee-details">{emp.id} - {emp.position}</div>
@@ -362,11 +508,11 @@ const Employee: React.FC = () => {
                   <td>{emp.matricule}</td>
                   <td>
                     {emp.fromRecap ? (
-                      <span className="employee-details">Imported</span>
+                      <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id, emp.fromRecap)}>🗑️</button>
                     ) : (
                       <>
                         <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
-                        <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id)}>🗑️</button>
+                        <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id, emp.fromRecap)}>🗑️</button>
                       </>
                     )}
                   </td>
@@ -374,7 +520,7 @@ const Employee: React.FC = () => {
               ))}
               {filteredEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={15} style={{ textAlign: 'center', padding: '2rem' }}>Aucun employé trouvé.</td>
+                  <td colSpan={16} style={{ textAlign: 'center', padding: '2rem' }}>Aucun employé trouvé.</td>
                 </tr>
               )}
             </tbody>
@@ -479,6 +625,108 @@ const Employee: React.FC = () => {
                 />
               </div>
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Régime</label>
+                <input 
+                  type="text" 
+                  placeholder="Régime" 
+                  value={newEmployee.regime} 
+                  onChange={e => setNewEmployee({...newEmployee, regime: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Type d'effectif</label>
+                <input 
+                  type="text" 
+                  placeholder="Type d'effectif" 
+                  value={newEmployee.workforceType} 
+                  onChange={e => setNewEmployee({...newEmployee, workforceType: e.target.value})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Genre</label>
+                <select 
+                  value={newEmployee.gender} 
+                  onChange={e => setNewEmployee({...newEmployee, gender: e.target.value})}
+                >
+                  <option value="">Sélectionner</option>
+                  <option value="M">Homme</option>
+                  <option value="F">Femme</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>H. T (hours)</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.htHours} 
+                  onChange={e => setNewEmployee({...newEmployee, htHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>25% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.overtime25} 
+                  onChange={e => setNewEmployee({...newEmployee, overtime25: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>50% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.overtime50} 
+                  onChange={e => setNewEmployee({...newEmployee, overtime50: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>100% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.overtime100} 
+                  onChange={e => setNewEmployee({...newEmployee, overtime100: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Night Hours (H. NUIT)</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.nightHours} 
+                  onChange={e => setNewEmployee({...newEmployee, nightHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Absence Days</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.absenceDays} 
+                  onChange={e => setNewEmployee({...newEmployee, absenceDays: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Absence Hours</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={newEmployee.absenceHours} 
+                  onChange={e => setNewEmployee({...newEmployee, absenceHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
               <button className="btn-submit" onClick={handleAddEmployee}>Add employee</button>
@@ -574,9 +822,125 @@ const Employee: React.FC = () => {
                 />
               </div>
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Régime</label>
+                <input 
+                  type="text" 
+                  placeholder="Régime" 
+                  value={editForm.regime} 
+                  onChange={e => setEditForm({...editForm, regime: e.target.value})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Type d'effectif</label>
+                <input 
+                  type="text" 
+                  placeholder="Type d'effectif" 
+                  value={editForm.workforceType} 
+                  onChange={e => setEditForm({...editForm, workforceType: e.target.value})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Genre</label>
+                <select 
+                  value={editForm.gender} 
+                  onChange={e => setEditForm({...editForm, gender: e.target.value})}
+                >
+                  <option value="">Sélectionner</option>
+                  <option value="M">Homme</option>
+                  <option value="F">Femme</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>H. T (hours)</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.htHours} 
+                  onChange={e => setEditForm({...editForm, htHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>25% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.overtime25} 
+                  onChange={e => setEditForm({...editForm, overtime25: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>50% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.overtime50} 
+                  onChange={e => setEditForm({...editForm, overtime50: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>100% Overtime</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.overtime100} 
+                  onChange={e => setEditForm({...editForm, overtime100: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Night Hours (H. NUIT)</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.nightHours} 
+                  onChange={e => setEditForm({...editForm, nightHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Absence Days</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.absenceDays} 
+                  onChange={e => setEditForm({...editForm, absenceDays: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Absence Hours</label>
+                <input 
+                  type="number" 
+                  placeholder="0" 
+                  value={editForm.absenceHours} 
+                  onChange={e => setEditForm({...editForm, absenceHours: parseFloat(e.target.value) || 0})} 
+                />
+              </div>
+            </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
               <button className="btn-submit" onClick={handleSaveEdit}>Save changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Confirmer la suppression</h2>
+            <p>Êtes-vous sûr de vouloir supprimer {selectedForDelete.size} employé(s) ? Cette action ne peut pas être annulée.</p>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
+              <button className="btn-delete" onClick={handleBulkDelete}>Supprimer</button>
             </div>
           </div>
         </div>

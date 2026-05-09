@@ -41,6 +41,41 @@
   font-weight: 500;
 }
 
+.nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.nav-profile img,
+.nav-avatar-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex: 0 0 44px;
+}
+
+.nav-profile img {
+  object-fit: cover;
+}
+
+.nav-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+}
+
+.nav-profile h2,
+.nav-profile p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
 .close-sidebar {
   position: absolute;
   top: 1rem;

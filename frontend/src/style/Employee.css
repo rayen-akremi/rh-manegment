@@ -133,7 +133,8 @@
 }
 
 .btn-import,
-.btn-add {
+.btn-add,
+.btn-delete-bulk {
   padding: 0.75rem 1.5rem;
   border-radius: var(--radius-lg);
   font-weight: 600;
@@ -157,14 +158,21 @@
   color: white;
 }
 
+.btn-delete-bulk {
+  background: var(--danger);
+  color: white;
+}
+
 .btn-import:hover,
-.btn-add:hover {
+.btn-add:hover,
+.btn-delete-bulk:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
 .btn-import:active,
-.btn-add:active {
+.btn-add:active,
+.btn-delete-bulk:active {
   transform: translateY(0);
 }
 
@@ -255,6 +263,24 @@
 
 .action-btn:hover {
   transform: scale(1.1);
+}
+
+.btn-delete {
+  background: var(--danger) !important;
+  color: white !important;
+}
+
+.btn-delete:hover {
+  background: var(--danger-dark) !important;
+}
+
+/* Checkbox styles */
+input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
 }
 
 .modal-overlay {

@@ -5,13 +5,13 @@ import ThemeToggle from './ThemeToggle';
 import '../style/navbar.css';
 
 const Navbar: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 1024);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -65,8 +65,19 @@ const Navbar: React.FC = () => {
 
       <div className={`sidebar ${isMobile ? (isOpen ? 'open' : '') : ''}`}>
         <div className="sidebar-header">
-          <h2>HR</h2>
-          <p>Smart HR Analytics</p>
+          <div className="nav-profile">
+            {user?.avatar ? (
+              <img src={user.avatar} alt="Avatar" />
+            ) : (
+              <div className="nav-avatar-placeholder">
+                {(user?.username || 'A').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h2>{user?.username || 'Admin'}</h2>
+              <p>{user?.email || 'Smart HR Analytics'}</p>
+            </div>
+          </div>
           {isMobile && (
             <button className="close-sidebar" onClick={closeSidebar}>✕</button>
           )}

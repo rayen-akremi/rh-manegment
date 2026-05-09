@@ -1,15 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from './Navbar';
+import { useAuth } from '../context/AuthContext';
 import '../style/Settings.css';
-
-interface UserProfile {
-  name: string;
-  email: string;
-  role: string;
-  department: string;
-  phone: string;
-  avatar: string;
-}
 
 interface NotificationSettings {
   emailNotifications: boolean;
@@ -31,14 +23,17 @@ interface SystemSettings {
 }
 
 const Settings: React.FC = () => {
+  const { user, updateProfile, logoutAll } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
-  const [profile, setProfile] = useState<UserProfile>({
-    name: 'John Doe',
-    email: 'john.doe@rh.com',
-    role: 'HR Manager',
-    department: 'Human Resources',
-    phone: '+216 12 345 678',
-    avatar: '',
+  const [username, setUsername] = useState(user?.username || '');
+  const [avatar, setAvatar] = useState<string | null>(user?.avatar || null);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
   const [notifications, setNotifications] = useState<NotificationSettings>({
     emailNotifications: true,
@@ -57,26 +52,83 @@ const Settings: React.FC = () => {
     overtimeThreshold: 45,
     absenceThreshold: 3,
   });
-  const [saved, setSaved] = useState(false);
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
 
-  // Load saved settings from localStorage
   useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
+    setUsername(user?.username || '');
+    setAvatar(user?.avatar || null);
+  }, [user]);
+
+  useEffect(() => {
     const savedNotifications = localStorage.getItem('notificationSettings');
     const savedSystem = localStorage.getItem('systemSettings');
 
-    if (savedProfile) setProfile(JSON.parse(savedProfile));
     if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
     if (savedSystem) setSystem(JSON.parse(savedSystem));
   }, []);
 
-  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProfile({ ...profile, [e.target.name]: e.target.value });
+  const showSaved = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
+  const saveProfile = async () => {
+    setError('');
+    setSaving(true);
+    const success = await updateProfile({ username, avatar });
+    setSaving(false);
+
+    if (success) {
+      showSaved();
+    } else {
+      setError('Profile update failed');
+    }
+  };
+
+  const updatePassword = async () => {
+    setError('');
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caracteres');
+      return;
+    }
+
+    setSaving(true);
+    const success = await updateProfile({
+      currentPassword: passwordData.currentPassword,
+      password: passwordData.newPassword,
+    });
+    setSaving(false);
+
+    if (success) {
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSaved();
+    } else {
+      setError('Mot de passe actuel incorrect');
+    }
+  };
+
+  const saveNotifications = () => {
+    localStorage.setItem('notificationSettings', JSON.stringify(notifications));
+    showSaved();
+  };
+
+  const saveSystem = () => {
+    localStorage.setItem('systemSettings', JSON.stringify(system));
+    showSaved();
   };
 
   const handleNotificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,82 +140,11 @@ const Settings: React.FC = () => {
     setSystem({ ...system, [e.target.name]: value });
   };
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPasswordData({ ...passwordData, [e.target.name]: e.target.value });
-  };
-
-  const saveProfile = () => {
-    localStorage.setItem('userProfile', JSON.stringify(profile));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const saveNotifications = () => {
-    localStorage.setItem('notificationSettings', JSON.stringify(notifications));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const saveSystem = () => {
-    localStorage.setItem('systemSettings', JSON.stringify(system));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
-
-  const updatePassword = () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('Les mots de passe ne correspondent pas');
-      return;
-    }
-    if (passwordData.newPassword.length < 6) {
-      alert('Le mot de passe doit contenir au moins 6 caractères');
-      return;
-    }
-    // Here you would call your API to update password
-    alert('Mot de passe mis à jour avec succès');
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  };
-
-  const resetToDefault = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir réinitialiser tous les paramètres par défaut ?')) {
-      setProfile({
-        name: 'John Doe',
-        email: 'john.doe@rh.com',
-        role: 'HR Manager',
-        department: 'Human Resources',
-        phone: '+216 12 345 678',
-        avatar: '',
-      });
-      setNotifications({
-        emailNotifications: true,
-        pushNotifications: false,
-        absenceAlerts: true,
-        turnoverAlerts: true,
-        workloadAlerts: false,
-        weeklyReport: true,
-        monthlyReport: false,
-      });
-      setSystem({
-        language: 'fr',
-        dateFormat: 'DD/MM/YYYY',
-        timezone: 'Africa/Tunis',
-        workingDaysPerMonth: 22,
-        overtimeThreshold: 45,
-        absenceThreshold: 3,
-      });
-      localStorage.removeItem('userProfile');
-      localStorage.removeItem('notificationSettings');
-      localStorage.removeItem('systemSettings');
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }
-  };
-
   const tabs = [
-    { id: 'profile', label: ' Profile', icon: '👤' },
-    { id: 'notifications', label: ' Notifications', icon: '🔔' },
-    { id: 'system', label: ' System', icon: '⚙️' },
-    { id: 'security', label: ' Security', icon: '🔒' },
+    { id: 'profile', label: 'Profile', icon: 'User' },
+    { id: 'notifications', label: 'Notifications', icon: 'Bell' },
+    { id: 'system', label: 'System', icon: 'Gear' },
+    { id: 'security', label: 'Security', icon: 'Lock' },
   ];
 
   return (
@@ -175,14 +156,10 @@ const Settings: React.FC = () => {
           <p>Manage your account preferences and system configuration</p>
         </div>
 
-        {saved && (
-          <div className="toast-success">
-            ✅ Settings saved successfully!
-          </div>
-        )}
+        {saved && <div className="toast-success">Settings saved successfully!</div>}
+        {error && <div className="toast-error">{error}</div>}
 
         <div className="settings-container">
-          {/* Sidebar Tabs */}
           <div className="settings-sidebar">
             {tabs.map(tab => (
               <button
@@ -196,228 +173,78 @@ const Settings: React.FC = () => {
             ))}
           </div>
 
-          {/* Main Content */}
           <div className="settings-content">
-            {/* Profile Settings */}
             {activeTab === 'profile' && (
               <div className="settings-section fade-in">
                 <h2>Profile Settings</h2>
-                <p className="section-desc">Update your personal information</p>
+                <p className="section-desc">Update the admin account stored in the database</p>
 
                 <div className="avatar-section">
                   <div className="avatar-preview">
-                    {profile.avatar ? (
-                      <img src={profile.avatar} alt="Avatar" />
+                    {avatar ? (
+                      <img src={avatar} alt="Avatar" />
                     ) : (
-                      <div className="avatar-placeholder">
-                        {profile.name.charAt(0).toUpperCase()}
-                      </div>
+                      <div className="avatar-placeholder">{(username || 'A').charAt(0).toUpperCase()}</div>
                     )}
                   </div>
-                  <button className="btn-secondary">Change Avatar</button>
+                  <label className="btn-secondary avatar-upload">
+                    Change Avatar
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} />
+                  </label>
+                  {avatar && (
+                    <button className="btn-secondary" onClick={() => setAvatar(null)}>
+                      Remove Avatar
+                    </button>
+                  )}
                 </div>
 
                 <div className="form-grid">
                   <div className="form-group">
-                    <label>Full Name</label>
+                    <label>Username</label>
                     <input
                       type="text"
-                      name="name"
-                      value={profile.name}
-                      onChange={handleProfileChange}
-                      placeholder="Enter your full name"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter username"
                     />
                   </div>
                   <div className="form-group">
                     <label>Email Address</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={profile.email}
-                      onChange={handleProfileChange}
-                      placeholder="Enter your email"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Role</label>
-                    <input
-                      type="text"
-                      name="role"
-                      value={profile.role}
-                      onChange={handleProfileChange}
-                      placeholder="Your role"
-                      disabled
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Department</label>
-                    <input
-                      type="text"
-                      name="department"
-                      value={profile.department}
-                      onChange={handleProfileChange}
-                      placeholder="Your department"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone Number</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={profile.phone}
-                      onChange={handleProfileChange}
-                      placeholder="Your phone number"
-                    />
+                    <input type="email" value={user?.email || 'manage@rh.com'} disabled />
                   </div>
                 </div>
 
                 <div className="form-actions">
-                  <button className="btn-primary" onClick={saveProfile}>
-                    Save Changes
-                  </button>
-                  <button className="btn-secondary" onClick={resetToDefault}>
-                    Reset to Default
+                  <button className="btn-primary" onClick={saveProfile} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Notification Settings */}
             {activeTab === 'notifications' && (
               <div className="settings-section fade-in">
                 <h2>Notification Preferences</h2>
                 <p className="section-desc">Choose what notifications you want to receive</p>
 
-                <div className="settings-group">
-                  <h3>Channel Settings</h3>
-                  <div className="toggle-item">
+                {Object.entries(notifications).map(([key, value]) => (
+                  <div className="toggle-item" key={key}>
                     <div className="toggle-info">
-                      <span className="toggle-title">Email Notifications</span>
-                      <span className="toggle-desc">Receive notifications via email</span>
+                      <span className="toggle-title">{key.replace(/([A-Z])/g, ' $1')}</span>
                     </div>
                     <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="emailNotifications"
-                        checked={notifications.emailNotifications}
-                        onChange={handleNotificationChange}
-                      />
+                      <input name={key} type="checkbox" checked={value} onChange={handleNotificationChange} />
                       <span className="toggle-slider"></span>
                     </label>
                   </div>
-
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Push Notifications</span>
-                      <span className="toggle-desc">Receive browser notifications</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="pushNotifications"
-                        checked={notifications.pushNotifications}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="settings-group">
-                  <h3>Alert Preferences</h3>
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Absence Alerts</span>
-                      <span className="toggle-desc">Get notified when an employee exceeds absence threshold</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="absenceAlerts"
-                        checked={notifications.absenceAlerts}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Turnover Alerts</span>
-                      <span className="toggle-desc">Get notified about unusual turnover rates</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="turnoverAlerts"
-                        checked={notifications.turnoverAlerts}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Workload Alerts</span>
-                      <span className="toggle-desc">Get notified about employees exceeding workload limits</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="workloadAlerts"
-                        checked={notifications.workloadAlerts}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="settings-group">
-                  <h3>Report Schedule</h3>
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Weekly Report</span>
-                      <span className="toggle-desc">Receive weekly HR summary report</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="weeklyReport"
-                        checked={notifications.weeklyReport}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="toggle-item">
-                    <div className="toggle-info">
-                      <span className="toggle-title">Monthly Report</span>
-                      <span className="toggle-desc">Receive detailed monthly analytics report</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        name="monthlyReport"
-                        checked={notifications.monthlyReport}
-                        onChange={handleNotificationChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                </div>
+                ))}
 
                 <div className="form-actions">
-                  <button className="btn-primary" onClick={saveNotifications}>
-                    Save Preferences
-                  </button>
+                  <button className="btn-primary" onClick={saveNotifications}>Save Preferences</button>
                 </div>
               </div>
             )}
 
-            {/* System Settings */}
             {activeTab === 'system' && (
               <div className="settings-section fade-in">
                 <h2>System Configuration</h2>
@@ -427,12 +254,10 @@ const Settings: React.FC = () => {
                   <div className="form-group">
                     <label>Language</label>
                     <select name="language" value={system.language} onChange={handleSystemChange}>
-                      <option value="fr">Français</option>
+                      <option value="fr">Francais</option>
                       <option value="en">English</option>
-                      <option value="ar">العربية</option>
                     </select>
                   </div>
-
                   <div className="form-group">
                     <label>Date Format</label>
                     <select name="dateFormat" value={system.dateFormat} onChange={handleSystemChange}>
@@ -441,69 +266,37 @@ const Settings: React.FC = () => {
                       <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                     </select>
                   </div>
-
                   <div className="form-group">
                     <label>Time Zone</label>
                     <select name="timezone" value={system.timezone} onChange={handleSystemChange}>
-                      <option value="Africa/Tunis">Africa/Tunis (GMT+1)</option>
-                      <option value="Europe/Paris">Europe/Paris (GMT+1/GMT+2)</option>
+                      <option value="Africa/Tunis">Africa/Tunis</option>
                       <option value="UTC">UTC</option>
                     </select>
                   </div>
-
                   <div className="form-group">
                     <label>Working Days Per Month</label>
-                    <input
-                      type="number"
-                      name="workingDaysPerMonth"
-                      value={system.workingDaysPerMonth}
-                      onChange={handleSystemChange}
-                      min="20"
-                      max="31"
-                    />
-                    <small>Used for absence rate calculation</small>
+                    <input name="workingDaysPerMonth" type="number" value={system.workingDaysPerMonth} onChange={handleSystemChange} />
                   </div>
-
                   <div className="form-group">
-                    <label>Overtime Threshold (hours)</label>
-                    <input
-                      type="number"
-                      name="overtimeThreshold"
-                      value={system.overtimeThreshold}
-                      onChange={handleSystemChange}
-                      min="0"
-                      max="100"
-                    />
-                    <small>Alert when overtime exceeds this value</small>
+                    <label>Overtime Threshold</label>
+                    <input name="overtimeThreshold" type="number" value={system.overtimeThreshold} onChange={handleSystemChange} />
                   </div>
-
                   <div className="form-group">
-                    <label>Absence Threshold (days)</label>
-                    <input
-                      type="number"
-                      name="absenceThreshold"
-                      value={system.absenceThreshold}
-                      onChange={handleSystemChange}
-                      min="0"
-                      max="30"
-                    />
-                    <small>Alert when absence exceeds this value</small>
+                    <label>Absence Threshold</label>
+                    <input name="absenceThreshold" type="number" value={system.absenceThreshold} onChange={handleSystemChange} />
                   </div>
                 </div>
 
                 <div className="form-actions">
-                  <button className="btn-primary" onClick={saveSystem}>
-                    Save System Settings
-                  </button>
+                  <button className="btn-primary" onClick={saveSystem}>Save System Settings</button>
                 </div>
               </div>
             )}
 
-            {/* Security Settings */}
             {activeTab === 'security' && (
               <div className="settings-section fade-in">
                 <h2>Security Settings</h2>
-                <p className="section-desc">Manage your password and security preferences</p>
+                <p className="section-desc">Manage your password and active sessions</p>
 
                 <div className="settings-group">
                   <h3>Change Password</h3>
@@ -511,50 +304,37 @@ const Settings: React.FC = () => {
                     <label>Current Password</label>
                     <input
                       type="password"
-                      name="currentPassword"
                       value={passwordData.currentPassword}
-                      onChange={handlePasswordChange}
+                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                       placeholder="Enter current password"
                     />
                   </div>
-
                   <div className="form-group">
                     <label>New Password</label>
                     <input
                       type="password"
-                      name="newPassword"
                       value={passwordData.newPassword}
-                      onChange={handlePasswordChange}
+                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                       placeholder="Enter new password"
                     />
                   </div>
-
                   <div className="form-group">
                     <label>Confirm New Password</label>
                     <input
                       type="password"
-                      name="confirmPassword"
                       value={passwordData.confirmPassword}
-                      onChange={handlePasswordChange}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                       placeholder="Confirm new password"
                     />
                   </div>
-
-                  <button className="btn-primary" onClick={updatePassword}>
-                    Update Password
+                  <button className="btn-primary" onClick={updatePassword} disabled={saving}>
+                    {saving ? 'Saving...' : 'Update Password'}
                   </button>
                 </div>
 
                 <div className="settings-group">
                   <h3>Session Management</h3>
-                  <button className="btn-danger">Log out from all devices</button>
-                </div>
-
-                <div className="settings-group">
-                  <h3>Data Management</h3>
-                  <button className="btn-warning" onClick={resetToDefault}>
-                    Reset All Settings to Default
-                  </button>
+                  <button className="btn-danger" onClick={logoutAll}>Log out from all sessions</button>
                 </div>
               </div>
             )}

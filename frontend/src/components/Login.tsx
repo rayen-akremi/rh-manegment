@@ -4,18 +4,29 @@ import { useAuth } from '../context/AuthContext';
 import '../style/Login.css';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('manage@rh.com');
+  const [password, setPassword] = useState('admin123');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(email, password)) {
-      navigate('/dashboard');
-    } else {
-      setError('Email ou mot de passe incorrect');
+    setError('');
+    setLoading(true);
+
+    try {
+      const success = await login(email, password);
+      if (success) {
+        navigate('/dashboard');
+      } else {
+        setError('Email ou mot de passe incorrect');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Une erreur est survenue');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -36,6 +47,7 @@ const Login: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           <div className="input-group">
@@ -46,10 +58,13 @@ const Login: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={loading}
             />
           </div>
           {error && <div className="error-message">{error}</div>}
-          <button type="submit">SE CONNECTER</button>
+          <button type="submit" disabled={loading}>
+            {loading ? 'Connexion...' : 'SE CONNECTER'}
+          </button>
         </form>
         <footer>
           <p>© 2026 Smart HR Analytics — Portail de gestion des ressources humaines</p>
