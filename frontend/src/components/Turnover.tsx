@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
+import { Trash2 } from 'lucide-react';
 import Navbar from './Navbar';
 import '../style/Turnover.css';
 
@@ -96,6 +97,8 @@ const Turnover: React.FC = () => {
   const [yearFilter, setYearFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTurnover, setNewTurnover] = useState<TurnoverForm>(emptyTurnoverForm);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   const selectedYear = yearFilter === 'All' ? '' : yearFilter;
 
@@ -199,6 +202,65 @@ const Turnover: React.FC = () => {
     }
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      setSelectAll(false);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(departures.map((d) => d._id));
+      setSelectedIds(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected record(s)?`)) return;
+    try {
+      const res = await fetch('/api/turnover-history/departures', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to delete selected records');
+      setSelectedIds(new Set());
+      setSelectAll(false);
+      await fetchTurnoverData();
+      alert(data.message || 'Selected records deleted');
+    } catch (err: any) {
+      alert(`Delete selected error: ${err.message}`);
+    }
+  };
+
+  const handleDeleteTurnover = async (id: string, employeeName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the record for ${employeeName}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/turnover-history/departures/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to delete turnover');
+      await fetchTurnoverData();
+      alert('Record deleted successfully');
+    } catch (err: any) {
+      alert(`Delete error: ${err.message}`);
+    }
+  };
+
   return (
     <div>
       <Navbar />
@@ -216,6 +278,9 @@ const Turnover: React.FC = () => {
               {importing ? 'Importing...' : 'Import ODS/XLSX'}
               <input type="file" accept=".ods,.xlsx,.xls" onChange={handleImport} hidden disabled={importing} />
             </label>
+            <button className="btn-delete-selected" onClick={handleDeleteSelected} disabled={selectedIds.size===0}>
+              Delete selected ({selectedIds.size})
+            </button>
             <button className="btn-add-turnover" onClick={() => setShowAddModal(true)}>Add turnover</button>
           </div>
         </div>
@@ -332,6 +397,7 @@ const Turnover: React.FC = () => {
                 <table className="registre-table turnover-wide-table">
                   <thead>
                     <tr>
+                      <th><input type="checkbox" checked={selectAll} onChange={toggleSelectAll} /></th>
                       <th>Mois</th>
                       <th>Nom et Prénom</th>
                       <th>Position</th>
@@ -346,11 +412,19 @@ const Turnover: React.FC = () => {
                       <th>Motif de départ</th>
                       <th>Cause de départ</th>
                       <th>Cumul</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayedDepartures.map((departure) => (
                       <tr key={departure._id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(departure._id)}
+                            onChange={() => toggleSelect(departure._id)}
+                          />
+                        </td>
                         <td>{formatDate(departure.month)}</td>
                         <td>{departure.employeeName}</td>
                         <td>{departure.position || '-'}</td>
@@ -365,11 +439,20 @@ const Turnover: React.FC = () => {
                         <td>{departure.departureReason || '-'}</td>
                         <td>{departure.departureCause || '-'}</td>
                         <td>{departure.cumulative || '-'}</td>
+                        <td className="action-cell">
+                          <button 
+                            className="btn-delete"
+                            onClick={() => handleDeleteTurnover(departure._id, departure.employeeName)}
+                            title="Delete this record"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {displayedDepartures.length === 0 && (
                       <tr>
-                        <td colSpan={14} className="empty-row">No turnover departures imported yet.</td>
+                        <td colSpan={15} className="empty-row">No turnover departures imported yet.</td>
                       </tr>
                     )}
                   </tbody>

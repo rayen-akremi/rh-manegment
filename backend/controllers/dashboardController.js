@@ -3,12 +3,19 @@ const Absence = require('../models/Absence');
 const Workload = require('../models/Workload');
 const MonthlyRecap = require('../models/MonthlyRecap');
 const TurnoverHistory = require('../models/TurnoverHistory');
+const TurnoverDeparture = require('../models/TurnoverDeparture');
 const aiPythonClient = require('../services/aiPythonClient');
 
 const CALENDAR_DAYS_PER_MONTH = 30;
 
 // Month labels matching TurnoverHistory enum (note 'Août' not 'Aoû')
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+// Helper function to calculate turnover rate from departures
+const calculateTurnoverRate = (departures, totalEmployees) => {
+  if (!totalEmployees || departures === 0) return 0;
+  return parseFloat(((departures / totalEmployees) * 100).toFixed(2));
+};
 
 // ========== 1. GET KPI DATA ==========
 exports.getKpi = async (req, res) => {
@@ -44,7 +51,20 @@ exports.getKpi = async (req, res) => {
       overtimeHours = workloads[0]?.totalOvertime || 0;
     }
 
+    // Get turnover rate from TurnoverHistory or calculate from departures
+    let turnoverRate = 0;
     const lastTurnover = await TurnoverHistory.findOne().sort({ year: -1, month: -1 });
+    if (lastTurnover?.turnoverRate) {
+      turnoverRate = lastTurnover.turnoverRate;
+    } else {
+      // Calculate from recent departures (last 12 months)
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const recentDepartures = await TurnoverDeparture.countDocuments({
+        departureDate: { $gte: oneYearAgo }
+      });
+      turnoverRate = calculateTurnoverRate(recentDepartures, totalEmployees);
+    }
     
     let absenceRate = 0;
     if (totalEmployees > 0 && finalTotalAbsenceDays > 0) {
@@ -54,7 +74,7 @@ exports.getKpi = async (req, res) => {
     
     res.json({
       absenceRate,
-      turnoverRate: lastTurnover?.turnoverRate || 0,
+      turnoverRate,
       totalEmployees,
       overtimeHours: parseFloat(overtimeHours.toFixed(1))
     });
@@ -113,7 +133,16 @@ exports.getMonthlyData = async (req, res) => {
       
       // Use the correctly calculated year when querying TurnoverHistory
       const turnoverData = await TurnoverHistory.findOne({ month: monthName, year });
-      const turnoverRate = turnoverData?.turnoverRate || 0;
+      
+      let turnoverRate = turnoverData?.turnoverRate || 0;
+      
+      // If no TurnoverHistory data, calculate from departures
+      if (!turnoverRate) {
+        const departuresThisMonth = await TurnoverDeparture.countDocuments({
+          departureDate: { $gte: startDate, $lte: endDate }
+        });
+        turnoverRate = calculateTurnoverRate(departuresThisMonth, totalEmployees);
+      }
       
       monthlyData.push({
         month: monthName,

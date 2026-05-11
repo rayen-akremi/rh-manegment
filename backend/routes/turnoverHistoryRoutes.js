@@ -302,6 +302,33 @@ router.get('/year/:year', async (req, res) => {
   }
 });
 
+// DELETE multiple turnover departures by ids (body: { ids: [...] })
+router.delete('/departures', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids array is required' });
+    }
+    const result = await TurnoverDeparture.deleteMany({ _id: { $in: ids } });
+    res.json({ message: `${result.deletedCount} records deleted`, deletedCount: result.deletedCount });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE turnover departure by id
+router.delete('/departures/:id', async (req, res) => {
+  try {
+    const result = await TurnoverDeparture.findByIdAndDelete(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: 'Departure record not found' });
+    }
+    res.json({ message: 'Departure record deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE turnover history by id
 router.delete('/:id', async (req, res) => {
   try {
