@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell
+  PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
 import { 
   Users, Clock, TrendingUp, TrendingDown, Calendar, 
-  Award, BarChart3, PieChart as PieChartIcon 
+  Award, BarChart3, PieChart as PieChartIcon, Building2, Activity
 } from 'lucide-react';
 import Navbar from './Navbar';
 import '../style/Dashboard.css';
@@ -37,6 +37,19 @@ interface TopEmployee {
   hours?: number;
 }
 
+interface DeptData {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface OvertimeDeptData {
+  name: string;
+  hours: number;
+  employees: number;
+  color: string;
+}
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -62,13 +75,16 @@ const Dashboard: React.FC = () => {
   const [absenceReasons, setAbsenceReasons] = useState<ReasonData[]>([]);
   const [topAbsences, setTopAbsences] = useState<TopEmployee[]>([]);
   const [topOvertime, setTopOvertime] = useState<TopEmployee[]>([]);
+  const [employeesByDept, setEmployeesByDept] = useState<DeptData[]>([]);
+  const [overtimeByDept, setOvertimeByDept] = useState<OvertimeDeptData[]>([]);
+  const [deptBarChartKey, setDeptBarChartKey] = useState(0);
 
   // Fetch real data from backend
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
-      // Fetch KPI data
+      // Fetch enhanced KPI data with AI insights
       const kpiRes = await fetch('/api/dashboard/kpi');
       if (kpiRes.ok) {
         const kpiData = await kpiRes.json();
@@ -108,6 +124,25 @@ const Dashboard: React.FC = () => {
           setTopOvertime(topOvertimeData);
         }
       }
+
+      // Fetch employees by department
+      const deptRes = await fetch('/api/dashboard/employees-by-department');
+      if (deptRes.ok) {
+        const deptData = await deptRes.json();
+        if (deptData.length > 0) {
+          setEmployeesByDept(deptData);
+          setDeptBarChartKey(prev => prev + 1);
+        }
+      }
+
+      // Fetch overtime by department
+      const overtimeDeptRes = await fetch('/api/dashboard/overtime-by-department');
+      if (overtimeDeptRes.ok) {
+        const overtimeDeptData = await overtimeDeptRes.json();
+        if (overtimeDeptData.length > 0) {
+          setOvertimeByDept(overtimeDeptData);
+        }
+      }
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -116,8 +151,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // Auto-refresh dashboard data periodically
   useEffect(() => {
     fetchDashboardData();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchDashboardData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {
@@ -166,6 +205,32 @@ const Dashboard: React.FC = () => {
     }
   ];
 
+  // Custom tooltip for bar charts
+  const DeptBarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip">
+          <p className="tooltip-label">{payload[0].payload.name}</p>
+          <p className="tooltip-value">{payload[0].value} employés</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const OvertimeBarTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip">
+          <p className="tooltip-label">{payload[0].payload.name}</p>
+          <p className="tooltip-value">{payload[0].value}h supplémentaires</p>
+          <p className="tooltip-sub">{payload[0].payload.employees} employés</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div>
       <Navbar />
@@ -196,6 +261,7 @@ const Dashboard: React.FC = () => {
             ))}
           </motion.div>
 
+          {/* First charts row: Monthly evolution + Absence reasons pie */}
           <motion.div variants={itemVariants} className="charts-row">
             <div className="chart-card">
               <div className="chart-header">
@@ -270,6 +336,70 @@ const Dashboard: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Second charts row: Employees by dept + Overtime by dept */}
+          <motion.div variants={itemVariants} className="charts-row">
+            <div className="chart-card">
+              <div className="chart-header">
+                <div>
+                  <h3>Employés par département</h3>
+                  <p>Répartition des effectifs</p>
+                </div>
+                <Building2 size={20} className="chart-icon" />
+              </div>
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart 
+                    key={deptBarChartKey}
+                    data={employeesByDept.length > 0 ? employeesByDept : [{ name: 'Aucune donnée', value: 0, color: '#cbd5e1' }]} 
+                    layout="vertical"
+                    margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
+                    barCategoryGap="20%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                    <XAxis type="number" stroke="var(--text-muted)" />
+                    <YAxis type="category" dataKey="name" stroke="var(--text-muted)" width={120} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<DeptBarTooltip />} cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={24}>
+                      {employeesByDept.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="chart-card">
+              <div className="chart-header">
+                <div>
+                  <h3>Heures supplémentaires par département</h3>
+                  <p>Volume d'heures supplémentaires</p>
+                </div>
+                <Clock size={20} className="chart-icon" />
+              </div>
+              <div className="chart-wrapper">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart 
+                    data={overtimeByDept.length > 0 ? overtimeByDept : [{ name: 'Aucune donnée', hours: 0, employees: 0, color: '#cbd5e1' }]}
+                    layout="vertical"
+                    margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
+                    barCategoryGap="20%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                    <XAxis type="number" stroke="var(--text-muted)" />
+                    <YAxis type="category" dataKey="name" stroke="var(--text-muted)" width={120} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<OvertimeBarTooltip />} cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="hours" radius={[0, 6, 6, 0]} barSize={24}>
+                      {overtimeByDept.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </motion.div>

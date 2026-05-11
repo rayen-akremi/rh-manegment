@@ -483,6 +483,54 @@
   }
 }
 
+/* Custom Tooltip for Charts */
+.custom-tooltip {
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-lg);
+}
+
+[data-theme="dark"] .custom-tooltip {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.custom-tooltip .tooltip-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.25rem;
+}
+
+.custom-tooltip .tooltip-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary, #2563eb);
+}
+
+.custom-tooltip .tooltip-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted, #6b7280);
+  margin-top: 0.15rem;
+}
+
+/* Chart Wrapper */
+.chart-wrapper {
+  width: 100%;
+  overflow: visible;
+}
+
+/* No Data Placeholder */
+.no-data {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 /* Dark Mode Specific Enhancements */
 [data-theme="dark"] .stat-card,
 [data-theme="dark"] .chart-card,

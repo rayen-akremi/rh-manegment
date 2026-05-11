@@ -3,6 +3,9 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const MonthlyRecap = require('../models/MonthlyRecap');
 const ImportHistory = require('../models/ImportHistory');
+const Employe = require('../models/Employe');
+const Absence = require('../models/Absence');
+const Workload = require('../models/Workload');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -102,6 +105,89 @@ const buildSummary = async () => {
   };
 };
 
+// Sync MonthlyRecap data to Employe, Absence, and Workload collections
+const syncMonthlyRecapToCollections = async () => {
+  try {
+    const recaps = await MonthlyRecap.find();
+    
+    for (const recap of recaps) {
+      // Generate employee_id from matricule
+      const employee_id = recap.matricule || recap.employeeName?.replace(/\s+/g, '_') || `EMP_${Date.now()}`;
+      
+      // Create or update Employe record
+      const [prenom = '', nom = ''] = (recap.employeeName || '').split(/\s+/, 2);
+      
+      await Employe.findOneAndUpdate(
+        { employee_id },
+        {
+          employee_id,
+          matricule: recap.matricule,
+          prenom: prenom || recap.employeeName,
+          nom: nom || '',
+          email: `${recap.matricule || employee_id}@company.com`,
+          age: 30,
+          departement: recap.department || 'Unknown',
+          poste: 'Employee',
+          status: 'Actif',
+          regime: recap.regime,
+          workforceType: recap.workforceType,
+          gender: recap.gender,
+          htHours: recap.htHours || 40,
+          overtime25: recap.overtime25 || 0,
+          overtime50: recap.overtime50 || 0,
+          overtime100: recap.overtime100 || 0,
+          nightHours: recap.nightHours || 0,
+          absenceDays: recap.absenceDays || 0,
+          absenceHours: recap.absenceHours || 0
+        },
+        { upsert: true }
+      );
+
+      // Create Absence record if there are absence days
+      if (recap.absenceDays > 0) {
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        await Absence.findOneAndUpdate(
+          { absence_id: `ABS_${employee_id}_${now.getTime()}` },
+          {
+            absence_id: `ABS_${employee_id}_${now.getTime()}`,
+            employee_id,
+            name: recap.employeeName,
+            department: recap.department || 'Unknown',
+            type: 'Other',
+            days: recap.absenceDays,
+            startDate
+          },
+          { upsert: true }
+        );
+      }
+
+      // Create Workload record
+      const totalOvertimeHours = (recap.overtime25 || 0) + (recap.overtime50 || 0) + (recap.overtime100 || 0);
+      
+      await Workload.findOneAndUpdate(
+        { workload_id: `WORK_${employee_id}` },
+        {
+          workload_id: `WORK_${employee_id}`,
+          employee_id,
+          name: recap.employeeName,
+          department: recap.department || 'Unknown',
+          weeklyHours: recap.htHours || 40,
+          overtimeHours: totalOvertimeHours,
+          status: totalOvertimeHours > 20 ? 'Critical' : totalOvertimeHours > 10 ? 'High' : 'Normal'
+        },
+        { upsert: true }
+      );
+    }
+    
+    return { synced: recaps.length, message: 'Data synced successfully' };
+  } catch (error) {
+    console.error('Sync error:', error);
+    throw error;
+  }
+};
+
 router.get('/', async (req, res) => {
   try {
     const rows = await MonthlyRecap.find().sort({ importOrder: 1, sourceRowNumber: 1 });
@@ -114,6 +200,16 @@ router.get('/', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     res.json(await buildSummary());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Sync endpoint to populate Employe, Absence, and Workload from MonthlyRecap
+router.post('/sync', async (req, res) => {
+  try {
+    const result = await syncMonthlyRecapToCollections();
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -166,6 +262,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
       rows: imported,
       status: 'Success'
     });
+
+    // Sync data to other collections
+    await syncMonthlyRecapToCollections();
 
     res.status(201).json({
       message: `Imported ${imported} monthly recap records`,

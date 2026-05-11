@@ -370,6 +370,7 @@ const ImportFile: React.FC = () => {
         setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Success', rows: result.imported }, ...mockHistory]);
         localStorage.setItem('monthlyRecapLastImport', String(Date.now()));
         window.dispatchEvent(new Event('monthly-recap-imported'));
+        window.dispatchEvent(new Event('data-imported'));
         alert(`${result.message}. Rows detected: ${result.detectedRows}.`);
       } catch (err: any) {
         setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Failed', rows: 0 }, ...mockHistory]);
@@ -383,6 +384,8 @@ const ImportFile: React.FC = () => {
     if (detectedFileType !== 'turnover') {
       alert(`Import ${importType} démarré avec mapping: ${mapping.map((m) => `${m.systemField}<-${m.sourceColumn}`).join(', ')}\nPlanification: ${schedule || 'immédiate'}`);
       setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Success', rows: dataPreview.length }, ...mockHistory]);
+      window.dispatchEvent(new Event('employees-imported'));
+      window.dispatchEvent(new Event('data-imported'));
       return;
     }
 
@@ -405,6 +408,8 @@ const ImportFile: React.FC = () => {
         status: result.skipped > 0 ? 'Partial' : 'Success',
         rows: result.imported
       }, ...mockHistory]);
+      window.dispatchEvent(new Event('turnover-imported'));
+      window.dispatchEvent(new Event('data-imported'));
       alert(`${result.message}. Rows detected: ${result.detectedRows}. Skipped: ${result.skipped}.`);
     } catch (err: any) {
       setImportHistory([{ id: Date.now(), date: new Date().toISOString(), filename: file.name, status: 'Failed', rows: 0 }, ...mockHistory]);
