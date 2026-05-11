@@ -3,7 +3,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
-import { Trash2 } from 'lucide-react';
 import Navbar from './Navbar';
 import '../style/Turnover.css';
 
@@ -243,23 +242,7 @@ const Turnover: React.FC = () => {
     }
   };
 
-  const handleDeleteTurnover = async (id: string, employeeName: string) => {
-    if (!window.confirm(`Are you sure you want to delete the record for ${employeeName}?`)) {
-      return;
-    }
 
-    try {
-      const res = await fetch(`/api/turnover-history/departures/${id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Unable to delete turnover');
-      await fetchTurnoverData();
-      alert('Record deleted successfully');
-    } catch (err: any) {
-      alert(`Delete error: ${err.message}`);
-    }
-  };
 
   return (
     <div>
@@ -439,15 +422,7 @@ const Turnover: React.FC = () => {
                         <td>{departure.departureReason || '-'}</td>
                         <td>{departure.departureCause || '-'}</td>
                         <td>{departure.cumulative || '-'}</td>
-                        <td className="action-cell">
-                          <button 
-                            className="btn-delete"
-                            onClick={() => handleDeleteTurnover(departure._id, departure.employeeName)}
-                            title="Delete this record"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
+                        <td className="action-cell"></td>
                       </tr>
                     ))}
                     {displayedDepartures.length === 0 && (

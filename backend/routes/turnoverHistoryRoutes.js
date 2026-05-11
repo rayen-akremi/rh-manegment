@@ -316,18 +316,7 @@ router.delete('/departures', async (req, res) => {
   }
 });
 
-// DELETE turnover departure by id
-router.delete('/departures/:id', async (req, res) => {
-  try {
-    const result = await TurnoverDeparture.findByIdAndDelete(req.params.id);
-    if (!result) {
-      return res.status(404).json({ error: 'Departure record not found' });
-    }
-    res.json({ message: 'Departure record deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+
 
 // DELETE turnover history by id
 router.delete('/:id', async (req, res) => {
