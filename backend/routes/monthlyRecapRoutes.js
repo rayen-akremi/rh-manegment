@@ -147,11 +147,12 @@ const syncMonthlyRecapToCollections = async () => {
       if (recap.absenceDays > 0) {
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const absence_id = `ABS_RECAP_${employee_id}`;
         
         await Absence.findOneAndUpdate(
-          { absence_id: `ABS_${employee_id}_${now.getTime()}` },
+          { absence_id },
           {
-            absence_id: `ABS_${employee_id}_${now.getTime()}`,
+            absence_id,
             employee_id,
             name: recap.employeeName,
             department: recap.department || 'Unknown',

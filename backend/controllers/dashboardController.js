@@ -11,6 +11,47 @@ const CALENDAR_DAYS_PER_MONTH = 30;
 // Month labels matching TurnoverHistory enum (note 'Août' not 'Aoû')
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
+const roundRate = (value, decimals = 2) => Number(value.toFixed(decimals));
+
+const getDashboardEmployeeCount = async () => {
+  const recapCount = await MonthlyRecap.countDocuments();
+  if (recapCount > 0) return recapCount;
+  return Employe.countDocuments();
+};
+
+const getMonthlyRecapAbsenceDays = async () => {
+  const result = await MonthlyRecap.aggregate([
+    { $group: { _id: null, total: { $sum: "$absenceDays" } } }
+  ]);
+  return result[0]?.total || 0;
+};
+
+const getEmployeeAbsenceDays = async () => {
+  const result = await Employe.aggregate([
+    { $group: { _id: null, total: { $sum: "$absenceDays" } } }
+  ]);
+  return result[0]?.total || 0;
+};
+
+const getAbsenceDaysFromRecords = async (startDate, endDate) => {
+  const match = {};
+  if (startDate && endDate) {
+    match.startDate = { $gte: startDate, $lte: endDate };
+  }
+
+  const result = await Absence.aggregate([
+    ...(Object.keys(match).length ? [{ $match: match }] : []),
+    { $group: { _id: null, totalDays: { $sum: "$days" } } }
+  ]);
+
+  return result[0]?.totalDays || 0;
+};
+
+const calculateAbsenceRate = (absenceDays, totalEmployees, daysInPeriod = CALENDAR_DAYS_PER_MONTH) => {
+  if (!totalEmployees || !absenceDays || !daysInPeriod) return 0;
+  return roundRate((absenceDays / (totalEmployees * daysInPeriod)) * 100, 2);
+};
+
 // Helper function to calculate turnover rate from departures
 const calculateTurnoverRate = (departures, totalEmployees) => {
   if (!totalEmployees || departures === 0) return 0;
@@ -20,24 +61,16 @@ const calculateTurnoverRate = (departures, totalEmployees) => {
 // ========== 1. GET KPI DATA ==========
 exports.getKpi = async (req, res) => {
   try {
-    // Primary source: MonthlyRecap (most accurate imported data)
     const recaps = await MonthlyRecap.find();
-    const recapCount = recaps.length;
-    
-    // Fallback: Employe collection
-    const employeeCount = await Employe.countDocuments();
-    const totalEmployees = recapCount > 0 ? recapCount : (employeeCount || 0);
+    const totalEmployees = recaps.length || await Employe.countDocuments();
 
-    // Get total absence days from MonthlyRecap
-    const totalAbsenceDays = recaps.reduce((sum, r) => sum + (r.absenceDays || 0), 0);
-    
-    // If no monthly recap data, try from Employe collection
-    let absenceFromEmployees = 0;
-    if (totalAbsenceDays === 0 && employeeCount > 0) {
-      const employees = await Employe.find();
-      absenceFromEmployees = employees.reduce((sum, emp) => sum + (emp.absenceDays || 0), 0);
+    let finalTotalAbsenceDays = await getAbsenceDaysFromRecords();
+    if (finalTotalAbsenceDays === 0) {
+      finalTotalAbsenceDays = await getMonthlyRecapAbsenceDays();
     }
-    const finalTotalAbsenceDays = totalAbsenceDays || absenceFromEmployees;
+    if (finalTotalAbsenceDays === 0) {
+      finalTotalAbsenceDays = await getEmployeeAbsenceDays();
+    }
 
     // Get total overtime from MonthlyRecap (sum of all overtime types)
     const totalOvertime25 = recaps.reduce((sum, r) => sum + (r.overtime25 || 0), 0);
@@ -66,11 +99,7 @@ exports.getKpi = async (req, res) => {
       turnoverRate = calculateTurnoverRate(recentDepartures, totalEmployees);
     }
     
-    let absenceRate = 0;
-    if (totalEmployees > 0 && finalTotalAbsenceDays > 0) {
-      const totalPossibleDays = totalEmployees * CALENDAR_DAYS_PER_MONTH;
-      absenceRate = parseFloat(((finalTotalAbsenceDays / totalPossibleDays) * 100).toFixed(2));
-    }
+    const absenceRate = calculateAbsenceRate(finalTotalAbsenceDays, totalEmployees);
     
     res.json({
       absenceRate,
@@ -90,7 +119,8 @@ exports.getMonthlyData = async (req, res) => {
     const currentMonth = currentDate.getMonth(); // 0-based
     const currentYear = currentDate.getFullYear();
     
-    const totalEmployees = await MonthlyRecap.countDocuments() || await Employe.countDocuments();
+    const totalEmployees = await getDashboardEmployeeCount();
+    const monthlyRecapAbsenceDays = await getMonthlyRecapAbsenceDays();
     
     const monthlyData = [];
     
@@ -107,29 +137,23 @@ exports.getMonthlyData = async (req, res) => {
 
       const startDate = new Date(year, monthIndex, 1);
       const endDate = new Date(year, monthIndex + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
 
-      const absencesThisMonth = await Absence.aggregate([
-        { $match: { startDate: { $gte: startDate, $lte: endDate } } },
-        { $group: { _id: null, totalDays: { $sum: "$days" } } }
-      ]);
-      
-      let totalAbsenceDaysThisMonth = absencesThisMonth[0]?.totalDays || 0;
-      
-      // Fallback: use total from MonthlyRecap spread across months
-      if (totalAbsenceDaysThisMonth === 0 && totalEmployees > 0) {
-        const totalAD = await MonthlyRecap.aggregate([
-          { $group: { _id: null, total: { $sum: "$absenceDays" } } }
-        ]);
-        const grandTotal = totalAD[0]?.total || 0;
-        // Spread evenly across 6 months
-        totalAbsenceDaysThisMonth = grandTotal / 6;
+      let totalAbsenceDaysThisMonth = await getAbsenceDaysFromRecords(startDate, endDate);
+
+      // MonthlyRecap is an imported snapshot without a month field.
+      // Use it only for the current month instead of spreading it over the chart.
+      if (
+        totalAbsenceDaysThisMonth === 0 &&
+        monthlyRecapAbsenceDays > 0 &&
+        monthIndex === currentMonth &&
+        year === currentYear
+      ) {
+        totalAbsenceDaysThisMonth = monthlyRecapAbsenceDays;
       }
-      
-      let absenceRate = 0;
-      if (totalEmployees > 0 && totalAbsenceDaysThisMonth > 0) {
-        const totalPossibleDays = totalEmployees * CALENDAR_DAYS_PER_MONTH;
-        absenceRate = parseFloat(((totalAbsenceDaysThisMonth / totalPossibleDays) * 100).toFixed(1));
-      }
+
+      const daysInMonth = endDate.getDate();
+      const absenceRate = calculateAbsenceRate(totalAbsenceDaysThisMonth, totalEmployees, daysInMonth);
       
       // Use the correctly calculated year when querying TurnoverHistory
       const turnoverData = await TurnoverHistory.findOne({ month: monthName, year });
@@ -557,11 +581,12 @@ exports.syncCollections = async (req, res) => {
         if (recap.absenceDays > 0) {
           const now = new Date();
           const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          const absence_id = `ABS_RECAP_${employee_id}`;
           
           await Absence.findOneAndUpdate(
-            { absence_id: `ABS_${employee_id}` },
+            { absence_id },
             {
-              absence_id: `ABS_${employee_id}`,
+              absence_id,
               employee_id,
               name: recap.employeeName || recap.matricule,
               department: recap.department || 'Unknown',

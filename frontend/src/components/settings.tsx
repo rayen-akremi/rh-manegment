@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import { useAuth } from '../context/AuthContext';
 import '../style/Settings.css';
@@ -24,9 +25,10 @@ interface SystemSettings {
 
 const Settings: React.FC = () => {
   const { user, updateProfile, logoutAll } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
   const [username, setUsername] = useState(user?.username || '');
-  const [avatar, setAvatar] = useState<string | null>(user?.avatar || null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -55,15 +57,25 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     setUsername(user?.username || '');
-    setAvatar(user?.avatar || null);
+    setAvatarPreview(user?.avatar || null);
   }, [user]);
 
   useEffect(() => {
-    const savedNotifications = localStorage.getItem('notificationSettings');
-    const savedSystem = localStorage.getItem('systemSettings');
+    try {
+      const savedNotifications = localStorage.getItem('notificationSettings');
+      const savedSystem = localStorage.getItem('systemSettings');
 
-    if (savedNotifications) setNotifications(JSON.parse(savedNotifications));
-    if (savedSystem) setSystem(JSON.parse(savedSystem));
+      if (savedNotifications) {
+        setNotifications((current) => ({ ...current, ...JSON.parse(savedNotifications) }));
+      }
+      if (savedSystem) {
+        setSystem((current) => ({ ...current, ...JSON.parse(savedSystem) }));
+      }
+    } catch {
+      localStorage.removeItem('notificationSettings');
+      localStorage.removeItem('systemSettings');
+      setError('Les parametres sauvegardes etaient invalides et ont ete reinitialises');
+    }
   }, []);
 
   const showSaved = () => {
@@ -75,15 +87,35 @@ const Settings: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      setError('Veuillez choisir une image valide');
+      return;
+    }
+
+    if (file.size > 1024 * 1024) {
+      setError('L image doit faire moins de 1 Mo');
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => setAvatar(String(reader.result));
+    reader.onload = () => {
+      setAvatarPreview(String(reader.result));
+      setError('');
+    };
+    reader.onerror = () => setError('Impossible de lire cette image');
     reader.readAsDataURL(file);
   };
 
   const saveProfile = async () => {
     setError('');
+
+    if (username.trim().length < 3) {
+      setError('Le nom utilisateur doit contenir au moins 3 caracteres');
+      return;
+    }
+
     setSaving(true);
-    const success = await updateProfile({ username, avatar });
+    const success = await updateProfile({ username: username.trim(), avatar: avatarPreview });
     setSaving(false);
 
     if (success) {
@@ -121,12 +153,53 @@ const Settings: React.FC = () => {
     }
   };
 
-  const saveNotifications = () => {
+  const saveNotifications = async () => {
+    setError('');
+
+    if (notifications.pushNotifications && 'Notification' in window) {
+      if (Notification.permission === 'denied') {
+        setNotifications((current) => ({ ...current, pushNotifications: false }));
+        setError('Les notifications du navigateur ont ete refusees');
+        return;
+      }
+
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          setNotifications((current) => ({ ...current, pushNotifications: false }));
+          setError('Les notifications du navigateur ont ete refusees');
+          return;
+        }
+      }
+    }
+
     localStorage.setItem('notificationSettings', JSON.stringify(notifications));
     showSaved();
   };
 
   const saveSystem = () => {
+    setError('');
+    const hasValidNumbers = [
+      system.workingDaysPerMonth,
+      system.overtimeThreshold,
+      system.absenceThreshold,
+    ].every(Number.isFinite);
+
+    if (!hasValidNumbers) {
+      setError('Veuillez remplir tous les champs numeriques');
+      return;
+    }
+
+    if (system.workingDaysPerMonth < 1 || system.workingDaysPerMonth > 31) {
+      setError('Les jours travailles par mois doivent etre entre 1 et 31');
+      return;
+    }
+
+    if (system.overtimeThreshold < 1 || system.absenceThreshold < 0) {
+      setError('Veuillez saisir des seuils systeme valides');
+      return;
+    }
+
     localStorage.setItem('systemSettings', JSON.stringify(system));
     showSaved();
   };
@@ -136,8 +209,19 @@ const Settings: React.FC = () => {
   };
 
   const handleSystemChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const value = e.target.type === 'number' ? parseInt(e.target.value) : e.target.value;
+    const value = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
     setSystem({ ...system, [e.target.name]: value });
+  };
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setError('');
+    setSaved(false);
+  };
+
+  const handleLogoutAll = async () => {
+    await logoutAll();
+    navigate('/login');
   };
 
   const tabs = [
@@ -165,7 +249,7 @@ const Settings: React.FC = () => {
               <button
                 key={tab.id}
                 className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
               >
                 <span className="tab-icon">{tab.icon}</span>
                 <span className="tab-label">{tab.label}</span>
@@ -181,8 +265,8 @@ const Settings: React.FC = () => {
 
                 <div className="avatar-section">
                   <div className="avatar-preview">
-                    {avatar ? (
-                      <img src={avatar} alt="Avatar" />
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Avatar" />
                     ) : (
                       <div className="avatar-placeholder">{(username || 'A').charAt(0).toUpperCase()}</div>
                     )}
@@ -191,8 +275,8 @@ const Settings: React.FC = () => {
                     Change Avatar
                     <input type="file" accept="image/*" onChange={handleAvatarChange} />
                   </label>
-                  {avatar && (
-                    <button className="btn-secondary" onClick={() => setAvatar(null)}>
+                  {avatarPreview && (
+                    <button className="btn-secondary" onClick={() => setAvatarPreview(null)}>
                       Remove Avatar
                     </button>
                   )}
@@ -230,7 +314,7 @@ const Settings: React.FC = () => {
                 {Object.entries(notifications).map(([key, value]) => (
                   <div className="toggle-item" key={key}>
                     <div className="toggle-info">
-                      <span className="toggle-title">{key.replace(/([A-Z])/g, ' $1')}</span>
+                      <span className="toggle-title">{key.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase())}</span>
                     </div>
                     <label className="toggle-switch">
                       <input name={key} type="checkbox" checked={value} onChange={handleNotificationChange} />
@@ -275,15 +359,15 @@ const Settings: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>Working Days Per Month</label>
-                    <input name="workingDaysPerMonth" type="number" value={system.workingDaysPerMonth} onChange={handleSystemChange} />
+                    <input name="workingDaysPerMonth" type="number" min="1" max="31" value={system.workingDaysPerMonth} onChange={handleSystemChange} />
                   </div>
                   <div className="form-group">
                     <label>Overtime Threshold</label>
-                    <input name="overtimeThreshold" type="number" value={system.overtimeThreshold} onChange={handleSystemChange} />
+                    <input name="overtimeThreshold" type="number" min="1" value={system.overtimeThreshold} onChange={handleSystemChange} />
                   </div>
                   <div className="form-group">
                     <label>Absence Threshold</label>
-                    <input name="absenceThreshold" type="number" value={system.absenceThreshold} onChange={handleSystemChange} />
+                    <input name="absenceThreshold" type="number" min="0" value={system.absenceThreshold} onChange={handleSystemChange} />
                   </div>
                 </div>
 
@@ -334,7 +418,7 @@ const Settings: React.FC = () => {
 
                 <div className="settings-group">
                   <h3>Session Management</h3>
-                  <button className="btn-danger" onClick={logoutAll}>Log out from all sessions</button>
+                  <button className="btn-danger" onClick={handleLogoutAll}>Log out from all sessions</button>
                 </div>
               </div>
             )}

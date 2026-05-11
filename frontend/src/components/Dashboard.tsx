@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { 
   Users, Clock, TrendingUp, TrendingDown, Calendar, 
-  Award, BarChart3, PieChart as PieChartIcon, Building2, Activity
+  Award, BarChart3, PieChart as PieChartIcon, Building2
 } from 'lucide-react';
 import Navbar from './Navbar';
 import '../style/Dashboard.css';
@@ -156,7 +156,13 @@ const Dashboard: React.FC = () => {
     fetchDashboardData();
     // Refresh every 5 minutes
     const interval = setInterval(fetchDashboardData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    window.addEventListener('monthly-recap-imported', fetchDashboardData);
+    window.addEventListener('turnover-imported', fetchDashboardData);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('monthly-recap-imported', fetchDashboardData);
+      window.removeEventListener('turnover-imported', fetchDashboardData);
+    };
   }, []);
 
   if (loading) {
