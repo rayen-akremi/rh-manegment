@@ -395,7 +395,7 @@ const Turnover: React.FC = () => {
                       <th>Motif de départ</th>
                       <th>Cause de départ</th>
                       <th>Cumul</th>
-                      <th>Actions</th>
+                      <th aria-label="actions"></th>
                     </tr>
                   </thead>
                   <tbody>
