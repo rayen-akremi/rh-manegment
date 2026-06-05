@@ -108,10 +108,20 @@ const WorkloadManagement: React.FC = () => {
 
   useEffect(() => {
     fetchWorkloads();
+    
+    const handleEmployeeDeleted = () => {
+      console.log('Employee deleted event received - refreshing workloads');
+      fetchWorkloads();
+    };
+    
+    window.addEventListener('employee-deleted', handleEmployeeDeleted);
+    
     const refresh = () => fetchWorkloads();
     window.addEventListener('monthly-recap-imported', refresh);
     window.addEventListener('storage', refresh);
+    
     return () => {
+      window.removeEventListener('employee-deleted', handleEmployeeDeleted);
       window.removeEventListener('monthly-recap-imported', refresh);
       window.removeEventListener('storage', refresh);
     };
@@ -342,7 +352,7 @@ const WorkloadManagement: React.FC = () => {
           <button className="btn-export" onClick={handleExport}>📤 Export report</button>
         </div>
 
-        {/* Table */}
+        {/* Table - WITHOUT Actions column */}
         <div className="table-section">
           <div className="table-header">
             <h2>Workload Overview</h2>
@@ -366,7 +376,6 @@ const WorkloadManagement: React.FC = () => {
                   <th>H. NUIT</th>
                   <th>Total overtime</th>
                   <th>Status</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -385,21 +394,11 @@ const WorkloadManagement: React.FC = () => {
                         {work.status}
                       </span>
                     </td>
-                    <td className="actions">
-                      {work.fromRecap ? (
-                        <span className="kpi-sub">Imported</span>
-                      ) : (
-                        <>
-                          <button className="edit-btn" onClick={() => handleEditClick(work)}>✏️</button>
-                          <button className="delete-btn" onClick={() => handleDelete(work.id)}>🗑️</button>
-                        </>
-                      )}
-                    </td>
                   </tr>
                 ))}
                 {filteredWorkloads.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>
                       Aucune charge de travail trouvée.
                     </td>
                   </tr>
@@ -455,7 +454,12 @@ const WorkloadManagement: React.FC = () => {
         <div className="ai-insights">
           <h3>🤖 AI Insights</h3>
           <ul>
-            <li>🔴 <strong>At-risk employees:</strong> {workloads.filter(w => w.status === 'Critical' || w.overtimeHours > 15).map(w => w.name).join(', ') || 'None'}</li>
+            <li>🔴 <strong>At-risk employees:</strong> {(() => {
+              const atRiskCount = workloads.filter(w => w.status === 'Critical' || w.overtimeHours > 15).length;
+              if (atRiskCount === 0) return 'Aucun employé à risque détecté.';
+              if (atRiskCount === 1) return '1 employé présente un risque élevé. Une attention particulière est recommandée.';
+              return `${atRiskCount} employés présentent un risque élevé. Une action immédiate est recommandée.`;
+            })()}</li>
             <li>⚠️ <strong>Workload redistribution</strong> needed for Sales and Finance departments.</li>
             <li>📅 <strong>Flexible scheduling</strong> recommended for teams exceeding 48h/week.</li>
           </ul>

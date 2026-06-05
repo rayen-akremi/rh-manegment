@@ -26,18 +26,18 @@ const departmentsList = ['Tous les départements', 'Engineering', 'Sales', 'Mark
 
 const availableFields: Record<DataType, Field[]> = {
   Employees: [
-    { id: 'id', label: 'ID Employé', selected: true },
+    { id: 'employee_id', label: 'ID Employé', selected: true },
     { id: 'name', label: 'Nom complet', selected: true },
     { id: 'department', label: 'Département', selected: true },
     { id: 'position', label: 'Poste', selected: true },
-    { id: 'absenceDays', label: 'Jours d\'absence', selected: true },
+    { id: 'absenceDays', label: "Jours d'absence", selected: true },
     { id: 'workloadHours', label: 'Charge hebdo (moyenne)', selected: true },
     { id: 'status', label: 'Statut', selected: true },
   ],
   Absences: [
     { id: 'employee', label: 'Employé', selected: true },
     { id: 'department', label: 'Département', selected: true },
-    { id: 'type', label: 'Type d\'absence', selected: true },
+    { id: 'type', label: "Type d'absence", selected: true },
     { id: 'days', label: 'Jours', selected: true },
     { id: 'startDate', label: 'Date début', selected: true },
   ],
@@ -57,47 +57,6 @@ const availableFields: Record<DataType, Field[]> = {
   ],
 };
 
-// Données réelles (initiales + importées)
-const initialAbsences = [
-  { employee: 'Maya Robinson', department: 'Engineering', type: 'Maladie', days: 4, startDate: '2025-09-02' },
-  { employee: 'Lucas Bernard', department: 'Sales', type: 'Vacances', days: 8, startDate: '2025-08-15' },
-  { employee: 'Lucas Bernard', department: 'Sales', type: 'Maladie', days: 4, startDate: '2025-09-20' },
-  { employee: 'Sophie Martin', department: 'Marketing', type: 'Vacances', days: 5, startDate: '2025-10-01' },
-];
-
-const initialWorkload = [
-  { employee: 'Sophia Rossi', department: 'Engineering', weeklyHours: 42, overtimeHours: 5, status: 'Normal' },
-  { employee: 'Lucas Bernard', department: 'Sales', weeklyHours: 48, overtimeHours: 12, status: 'Élevée' },
-  { employee: 'Emma Wilson', department: 'Marketing', weeklyHours: 38, overtimeHours: 2, status: 'Normal' },
-  { employee: 'John Doe', department: 'Finance', weeklyHours: 52, overtimeHours: 18, status: 'Critique' },
-];
-
-const getRealAbsences = () => {
-  const stored = localStorage.getItem('importedAbsences');
-  const imported = stored ? JSON.parse(stored) : [];
-  return [...initialAbsences, ...imported];
-};
-
-const getRealWorkload = () => {
-  const stored = localStorage.getItem('importedWorkloads');
-  const imported = stored ? JSON.parse(stored) : [];
-  return [...initialWorkload, ...imported];
-};
-
-const getAbsenceTotals = () => {
-  const absences = getRealAbsences();
-  const totals: Record<string, number> = {};
-  absences.forEach(a => { totals[a.employee] = (totals[a.employee] || 0) + a.days; });
-  return totals;
-};
-
-const getWorkloadHours = () => {
-  const workloads = getRealWorkload();
-  const hours: Record<string, number> = {};
-  workloads.forEach(w => { if (!hours[w.employee]) hours[w.employee] = w.weeklyHours; });
-  return hours;
-};
-
 const ExportFile: React.FC = () => {
   const [dataType, setDataType] = useState<DataType>('Employees');
   const [timeRange, setTimeRange] = useState<TimeRange>('monthly');
@@ -109,7 +68,9 @@ const ExportFile: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
+  // Charger l'historique des exports depuis localStorage
   useEffect(() => {
     const savedHistory = localStorage.getItem('exportHistory');
     if (savedHistory) setExportHistory(JSON.parse(savedHistory));
@@ -125,14 +86,14 @@ const ExportFile: React.FC = () => {
   const generateAISuggestions = (type: DataType) => {
     const suggestions: string[] = [];
     if (type === 'Employees') {
-      suggestions.push('📊 Format recommandé : XLSX – Vos 3 derniers exports utilisent ce format pour les rapports RH mensuels.');
-      suggestions.push('📈 Tendance détectée : Les heures supplémentaires ont augmenté de 12% ce mois-ci dans le service Ingénierie.');
-      suggestions.push('⚠️ Anomalie repérée : 5 employés présentent un taux d\'absence inhabituel — incluez-les dans le rapport.');
+      suggestions.push('📊 Format recommandé : XLSX – Exportez les données employés avec leurs absences et charges.');
+      suggestions.push('📈 Tendance : Les heures supplémentaires peuvent être analysées par département.');
+      suggestions.push('⚠️ Incluez les jours d\'absence pour une vue complète.');
     } else if (type === 'Absences') {
       suggestions.push('📅 Période recommandée : Mensuelle pour suivre les pics d\'absence.');
-      suggestions.push('🔍 Le département Support a un taux d\'absence 2x supérieur à la moyenne.');
+      suggestions.push('🔍 Filtrez par département pour identifier les équipes à risque.');
     } else if (type === 'Workload') {
-      suggestions.push('⚡ Surcharge détectée dans Finance et Sales (heures sup > 15h/semaine).');
+      suggestions.push('⚡ Exportez les charges pour détecter les risques de burnout.');
     } else {
       suggestions.push('★ Exportez les performances par trimestre pour les revues annuelles.');
     }
@@ -158,73 +119,170 @@ const ExportFile: React.FC = () => {
     setFields(fields.map(f => f.id === fieldId ? { ...f, selected: !f.selected } : f));
   };
 
-  const generateRealData = (): any[] => {
-    let data: any[] = [];
-    switch (dataType) {
-      case 'Absences':
-        data = getRealAbsences();
-        break;
-      case 'Workload':
-        data = getRealWorkload();
-        break;
-      case 'Employees': {
-        const baseEmployees = [
-          { id: 'EMP001', name: 'Sophia Rossi', department: 'Engineering', position: 'Dev Senior', status: 'Actif' },
-          { id: 'EMP002', name: 'Lucas Bernard', department: 'Sales', position: 'Account Manager', status: 'Actif' },
-          { id: 'EMP003', name: 'Emma Wilson', department: 'Marketing', position: 'Brand Manager', status: 'Congé' },
-          { id: 'EMP004', name: 'John Doe', department: 'Finance', position: 'CFO', status: 'Actif' },
-        ];
-        const absenceTotals = getAbsenceTotals();
-        const workloadHours = getWorkloadHours();
-        data = baseEmployees.map(emp => ({
-          ...emp,
-          absenceDays: absenceTotals[emp.name] || 0,
-          workloadHours: workloadHours[emp.name] || 0,
-        }));
-        break;
-      }
-      case 'Performance':
-        data = [
-          { employee: 'Sophia Rossi', department: 'Engineering', score: 88, rating: 'Excellent', quarter: 'Q3' },
-          { employee: 'Lucas Bernard', department: 'Sales', score: 76, rating: 'Bon', quarter: 'Q3' },
-        ];
-        break;
-    }
-    if (!selectedDepartments.includes('Tous les départements')) {
-      data = data.filter(row => selectedDepartments.includes(row.department));
-    }
-    if (dataType === 'Absences' && timeRange === 'custom' && customStart && customEnd) {
-      data = data.filter(item => item.startDate >= customStart && item.startDate <= customEnd);
-    }
-    const selectedFields = fields.filter(f => f.selected).map(f => f.id);
-    return data.map(row => {
-      const newRow: any = {};
-      selectedFields.forEach(field => {
-        let key = field;
-        if (field === 'absenceDays') key = 'absenceDays';
-        if (field === 'workloadHours') key = 'workloadHours';
-        if (field === 'employee') key = 'employee';
-        if (field === 'department') key = 'department';
-        if (field === 'type') key = 'type';
-        if (field === 'days') key = 'days';
-        if (field === 'startDate') key = 'startDate';
-        if (field === 'weeklyHours') key = 'weeklyHours';
-        if (field === 'overtimeHours') key = 'overtimeHours';
-        if (field === 'status') key = 'status';
-        if (field === 'name') key = 'name';
-        if (field === 'id') key = 'id';
-        if (field === 'position') key = 'position';
-        if (field === 'score') key = 'score';
-        if (field === 'rating') key = 'rating';
-        if (field === 'quarter') key = 'quarter';
-        newRow[field] = row[key];
+  // ========== RÉCUPÉRATION DES DONNÉES RÉELLES DEPUIS LE BACKEND ==========
+
+  // Récupérer tous les employés depuis l'API
+  const fetchRealEmployees = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/employees');
+      if (!response.ok) throw new Error('Erreur chargement employés');
+      const employees = await response.json();
+      
+      // Calculer les totaux d'absence et de workload pour chaque employé
+      const absences = await fetchRealAbsences();
+      const workloads = await fetchRealWorkloads();
+      
+      // Calculer les jours d'absence par employé
+      const absenceTotals: Record<string, number> = {};
+      absences.forEach((a: any) => {
+        const empName = a.name || a.employee;
+        if (empName) {
+          absenceTotals[empName] = (absenceTotals[empName] || 0) + (a.days || 0);
+        } else if (a.employee_id) {
+          absenceTotals[a.employee_id] = (absenceTotals[a.employee_id] || 0) + (a.days || 0);
+        }
       });
-      return newRow;
-    });
+      
+      // Calculer les heures de travail par employé
+      const workloadHours: Record<string, number> = {};
+      workloads.forEach((w: any) => {
+        const empName = w.name || w.employee;
+        if (empName) {
+          workloadHours[empName] = w.weeklyHours || 0;
+        } else if (w.employee_id) {
+          workloadHours[w.employee_id] = w.weeklyHours || 0;
+        }
+      });
+      
+      return employees.map((emp: any) => ({
+        employee_id: emp.employee_id,
+        name: `${emp.prenom || ''} ${emp.nom || ''}`.trim(),
+        department: emp.departement,
+        position: emp.poste,
+        status: emp.status,
+        age: emp.age,
+        absenceDays: absenceTotals[`${emp.prenom} ${emp.nom}`.trim()] || absenceTotals[emp.employee_id] || 0,
+        workloadHours: workloadHours[`${emp.prenom} ${emp.nom}`.trim()] || workloadHours[emp.employee_id] || 0,
+      }));
+    } catch (error) {
+      console.error('Erreur fetch employees:', error);
+      return [];
+    }
   };
 
-  const downloadFile = () => {
-    const data = generateRealData();
+  // Récupérer toutes les absences depuis l'API
+  const fetchRealAbsences = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/absences');
+      if (!response.ok) throw new Error('Erreur chargement absences');
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur fetch absences:', error);
+      return [];
+    }
+  };
+
+  // Récupérer toutes les charges de travail depuis l'API
+  const fetchRealWorkloads = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/workloads');
+      if (!response.ok) throw new Error('Erreur chargement workloads');
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur fetch workloads:', error);
+      return [];
+    }
+  };
+
+  // Récupérer les données de performance (si disponibles)
+  const fetchRealPerformances = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/performances');
+      if (!response.ok) return [];
+      return await response.json();
+    } catch (error) {
+      return [];
+    }
+  };
+
+  // Générer les données réelles selon le type sélectionné
+  const generateRealData = async (): Promise<any[]> => {
+    setLoading(true);
+    try {
+      switch (dataType) {
+        case 'Employees': {
+          return await fetchRealEmployees();
+        }
+        case 'Absences': {
+          let data = await fetchRealAbsences();
+          // Filtrer par département
+          if (!selectedDepartments.includes('Tous les départements')) {
+            data = data.filter((item: any) => selectedDepartments.includes(item.department));
+          }
+          // Filtrer par période
+          if (timeRange === 'custom' && customStart && customEnd) {
+            data = data.filter((item: any) => {
+              const itemDate = new Date(item.startDate);
+              const start = new Date(customStart);
+              const end = new Date(customEnd);
+              return itemDate >= start && itemDate <= end;
+            });
+          }
+          // Sélectionner les champs
+          const selectedFields = fields.filter(f => f.selected).map(f => f.id);
+          return data.map((row: any) => {
+            const newRow: any = {};
+            selectedFields.forEach(field => {
+              if (field === 'employee') newRow[field] = row.name || row.employee;
+              else if (field === 'department') newRow[field] = row.department;
+              else if (field === 'type') newRow[field] = row.type;
+              else if (field === 'days') newRow[field] = row.days;
+              else if (field === 'startDate') newRow[field] = row.startDate ? new Date(row.startDate).toISOString().split('T')[0] : '';
+              else newRow[field] = row[field];
+            });
+            return newRow;
+          });
+        }
+        case 'Workload': {
+          let data = await fetchRealWorkloads();
+          if (!selectedDepartments.includes('Tous les départements')) {
+            data = data.filter((item: any) => selectedDepartments.includes(item.department));
+          }
+          const selectedFields = fields.filter(f => f.selected).map(f => f.id);
+          return data.map((row: any) => {
+            const newRow: any = {};
+            selectedFields.forEach(field => {
+              if (field === 'employee') newRow[field] = row.name || row.employee;
+              else if (field === 'department') newRow[field] = row.department;
+              else if (field === 'weeklyHours') newRow[field] = row.weeklyHours;
+              else if (field === 'overtimeHours') newRow[field] = row.overtimeHours;
+              else if (field === 'status') newRow[field] = row.status;
+              else newRow[field] = row[field];
+            });
+            return newRow;
+          });
+        }
+        case 'Performance': {
+          let data = await fetchRealPerformances();
+          const selectedFields = fields.filter(f => f.selected).map(f => f.id);
+          return data.map((row: any) => {
+            const newRow: any = {};
+            selectedFields.forEach(field => {
+              newRow[field] = row[field];
+            });
+            return newRow;
+          });
+        }
+        default:
+          return [];
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadFile = async () => {
+    const data = await generateRealData();
     if (data.length === 0) {
       alert('Aucune donnée à exporter avec les filtres actuels.');
       return;
@@ -234,6 +292,7 @@ const ExportFile: React.FC = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, dataType);
     const filename = `${dataType}_${new Date().toISOString().slice(0,19)}.${fileFormat}`;
     XLSX.writeFile(workbook, filename, { bookType: fileFormat });
+    
     const newHistoryItem: ExportHistoryItem = {
       id: `EXP-${Date.now()}`,
       filename,
@@ -259,6 +318,12 @@ const ExportFile: React.FC = () => {
           <h1>Export de fichiers</h1>
           <p>Gérez et téléchargez vos rapports RH dans différents formats.</p>
         </div>
+
+        {loading && (
+          <div className="loading-overlay">
+            <div className="loading-spinner">Chargement des données...</div>
+          </div>
+        )}
 
         <div className="two-columns">
           {/* Colonne gauche : Options d'export */}
@@ -307,7 +372,7 @@ const ExportFile: React.FC = () => {
             </div>
           </div>
 
-          {/* Colonne droite : Personnalisation + Assistance IA (dans le carré) */}
+          {/* Colonne droite : Personnalisation + Assistance IA */}
           <div className="right-col">
             <div className="customization-section">
               <h2>Personnalisation du rapport</h2>
@@ -324,7 +389,6 @@ const ExportFile: React.FC = () => {
               </div>
             </div>
 
-            {/* Assistance IA - encadrée comme demandé */}
             <div className="ai-assistance">
               <h3>Assistance IA</h3>
               <p className="section-desc">Suggestions intelligentes basées sur vos données.</p>
@@ -337,8 +401,9 @@ const ExportFile: React.FC = () => {
 
         {/* Boutons d'action */}
         <div className="action-buttons">
-          <button className="btn-primary" onClick={downloadFile}>📥 Télécharger le fichier</button>
-          <button className="btn-secondary" onClick={() => {}}>✏️ Personnaliser</button>
+          <button className="btn-primary" onClick={downloadFile} disabled={loading}>
+            📥 Télécharger le fichier
+          </button>
           <button className="btn-danger" onClick={cancelExport}>🗑️ Annuler l'export</button>
           <button className="btn-info" onClick={() => setShowHistory(!showHistory)}>📜 Voir l'historique</button>
         </div>
@@ -372,7 +437,7 @@ const ExportFile: React.FC = () => {
                       <td>{item.date}</td>
                       <td>{item.size}</td>
                       <td><span className={`status-badge ${item.status}`}>{item.status === 'success' ? 'Réussi' : 'Échoué'}</span></td>
-                      <td><button className="btn-download" onClick={() => alert('Téléchargement simulé')}>📥 Télécharger</button></td>
+                      <td><button className="btn-download" onClick={() => alert('Téléchargement')}>📥 Télécharger</button></td>
                     </tr>
                   ))}
                 </tbody>

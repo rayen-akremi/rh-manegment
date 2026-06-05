@@ -31,7 +31,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="login-container">
+    <div className="login-container" style={{ backgroundImage: `url('/coficab.jpg')` }}>
       <div className="login-card">
         <div className="logo">
           <h1>COFICAB</h1>

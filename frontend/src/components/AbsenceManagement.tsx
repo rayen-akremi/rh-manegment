@@ -88,7 +88,6 @@ const AbsenceManagement: React.FC = () => {
       if (!response.ok) throw new Error('Erreur chargement employés');
       const data = await response.json();
       
-      // Handle different response structures
       let employeeArray = [];
       if (Array.isArray(data)) {
         employeeArray = data;
@@ -100,7 +99,6 @@ const AbsenceManagement: React.FC = () => {
         employeeArray = [];
       }
       
-      // Map employee data correctly with matricule
       const employeeList: Employee[] = employeeArray.map((emp: any) => ({
         id: emp.employee_id || emp.matricule || emp.id,
         name: `${emp.prenom || ''} ${emp.nom || ''}`.trim() || emp.name || `Employee ${emp.matricule || emp.employee_id}`,
@@ -179,16 +177,33 @@ const AbsenceManagement: React.FC = () => {
     }
   };
 
+  // Rafraîchir les données (utilisé après suppression d'employé)
+  const refreshData = () => {
+    fetchEmployees();
+    fetchAbsences();
+  };
+
   useEffect(() => {
     fetchEmployees();
     fetchAbsences();
+    
+    // Écouter l'événement de suppression d'employé
+    const handleEmployeeDeleted = () => {
+      console.log('Employee deleted event received - refreshing absences');
+      fetchAbsences();
+    };
+    
+    window.addEventListener('employee-deleted', handleEmployeeDeleted);
+    
     const refresh = () => {
       fetchEmployees();
       fetchAbsences();
     };
     window.addEventListener('monthly-recap-imported', refresh);
     window.addEventListener('storage', refresh);
+    
     return () => {
+      window.removeEventListener('employee-deleted', handleEmployeeDeleted);
       window.removeEventListener('monthly-recap-imported', refresh);
       window.removeEventListener('storage', refresh);
     };
@@ -417,7 +432,7 @@ const AbsenceManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table - WITHOUT Actions column */}
         <div className="records-section">
           <div className="records-header">
             <h2>Absence records</h2>
@@ -448,7 +463,6 @@ const AbsenceManagement: React.FC = () => {
                   <th>Employee</th>
                   <th>Department</th>
                   <th>ABS./jour</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,21 +472,11 @@ const AbsenceManagement: React.FC = () => {
                     <td>{rec.employee || '-'}</td>
                     <td>{rec.department || '-'}</td>
                     <td>{rec.days || 0}</td>
-                    <td className="actions">
-                      {rec.fromRecap ? (
-                        <span className="record-count">Imported</span>
-                      ) : (
-                        <>
-                          <button className="edit-btn" onClick={() => handleEditClick(rec)}>✏️</button>
-                          <button className="delete-btn" onClick={() => handleDelete(rec.id)}>🗑️</button>
-                        </>
-                      )}
-                    </td>
                   </tr>
                 ))}
                 {filteredAbsences.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="no-data">No absence records found.</td>
+                    <td colSpan={4} className="no-data">No absence records found.</td>
                   </tr>
                 )}
               </tbody>

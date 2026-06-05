@@ -18,12 +18,7 @@ interface EmployeeData {
   workforceType?: string;
   gender?: string;
   htHours?: number;
-  overtime25?: number;
-  overtime50?: number;
-  overtime100?: number;
   nightHours?: number;
-  absenceDays?: number;
-  absenceHours?: number;
   fromRecap?: boolean;
 }
 
@@ -38,6 +33,7 @@ const Employee: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeData | null>(null);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [newEmployee, setNewEmployee] = useState({
     prenom: '',
@@ -53,12 +49,7 @@ const Employee: React.FC = () => {
     workforceType: '',
     gender: '',
     htHours: 0,
-    overtime25: 0,
-    overtime50: 0,
-    overtime100: 0,
     nightHours: 0,
-    absenceDays: 0,
-    absenceHours: 0,
   });
 
   const [editForm, setEditForm] = useState({
@@ -75,13 +66,131 @@ const Employee: React.FC = () => {
     workforceType: '',
     gender: '',
     htHours: 0,
-    overtime25: 0,
-    overtime50: 0,
-    overtime100: 0,
     nightHours: 0,
-    absenceDays: 0,
-    absenceHours: 0,
   });
+
+  // Force refresh function
+  const forceRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
+  // Gestionnaires d'événements pour le formulaire d'ajout
+  const handleNewPrenomChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, prenom: value });
+  };
+
+  const handleNewNomChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, nom: value });
+  };
+
+  const handleNewIdChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, id: value });
+  };
+
+  const handleNewMatriculeChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, matricule: value });
+  };
+
+  const handleNewPositionChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, position: value });
+  };
+
+  const handleNewDepartmentChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, department: value });
+  };
+
+  const handleNewStatusChange = (value: EmployeeStatus) => {
+    setNewEmployee({ ...newEmployee, status: value });
+  };
+
+  const handleNewAgeChange = (value: number) => {
+    setNewEmployee({ ...newEmployee, age: value });
+  };
+
+  const handleNewJoinDateChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, joinDate: value });
+  };
+
+  const handleNewRegimeChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, regime: value });
+  };
+
+  const handleNewWorkforceTypeChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, workforceType: value });
+  };
+
+  const handleNewGenderChange = (value: string) => {
+    setNewEmployee({ ...newEmployee, gender: value });
+  };
+
+  const handleNewHtHoursChange = (value: number) => {
+    setNewEmployee({ ...newEmployee, htHours: value });
+  };
+
+  const handleNewNightHoursChange = (value: number) => {
+    setNewEmployee({ ...newEmployee, nightHours: value });
+  };
+
+  // Gestionnaires d'événements pour le formulaire d'édition
+  const handleEditPrenomChange = (value: string) => {
+    setEditForm({ ...editForm, prenom: value });
+  };
+
+  const handleEditNomChange = (value: string) => {
+    setEditForm({ ...editForm, nom: value });
+  };
+
+  const handleEditMatriculeChange = (value: string) => {
+    setEditForm({ ...editForm, matricule: value });
+  };
+
+  const handleEditPositionChange = (value: string) => {
+    setEditForm({ ...editForm, position: value });
+  };
+
+  const handleEditDepartmentChange = (value: string) => {
+    setEditForm({ ...editForm, department: value });
+  };
+
+  const handleEditStatusChange = (value: EmployeeStatus) => {
+    setEditForm({ ...editForm, status: value });
+  };
+
+  const handleEditAgeChange = (value: number) => {
+    setEditForm({ ...editForm, age: value });
+  };
+
+  const handleEditJoinDateChange = (value: string) => {
+    setEditForm({ ...editForm, joinDate: value });
+  };
+
+  const handleEditRegimeChange = (value: string) => {
+    setEditForm({ ...editForm, regime: value });
+  };
+
+  const handleEditWorkforceTypeChange = (value: string) => {
+    setEditForm({ ...editForm, workforceType: value });
+  };
+
+  const handleEditGenderChange = (value: string) => {
+    setEditForm({ ...editForm, gender: value });
+  };
+
+  const handleEditHtHoursChange = (value: number) => {
+    setEditForm({ ...editForm, htHours: value });
+  };
+
+  const handleEditNightHoursChange = (value: number) => {
+    setEditForm({ ...editForm, nightHours: value });
+  };
+
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+  };
 
   // ========== FETCH EMPLOYEES ==========
   const fetchEmployees = async () => {
@@ -109,12 +218,8 @@ const Employee: React.FC = () => {
         workforceType: emp.workforceType || '',
         gender: emp.gender || '',
         htHours: emp.htHours || 0,
-        overtime25: emp.overtime25 || 0,
-        overtime50: emp.overtime50 || 0,
-        overtime100: emp.overtime100 || 0,
         nightHours: emp.nightHours || 0,
-        absenceDays: emp.absenceDays || 0,
-        absenceHours: emp.absenceHours || 0,
+        fromRecap: false,
       }));
       
       const recapEmployees: EmployeeData[] = (recapData || []).map((item: any) => ({
@@ -131,13 +236,8 @@ const Employee: React.FC = () => {
         workforceType: item.workforceType || '',
         gender: item.gender || '',
         htHours: item.htHours || 0,
-        overtime25: item.overtime25 || 0,
-        overtime50: item.overtime50 || 0,
-        overtime100: item.overtime100 || 0,
         nightHours: item.nightHours || 0,
-        absenceDays: item.absenceDays || 0,
-        absenceHours: item.absenceHours || 0,
-        fromRecap: true
+        fromRecap: true,
       }));
 
       setEmployees(recapEmployees.length ? recapEmployees : formatted);
@@ -153,14 +253,20 @@ const Employee: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
-    const refresh = () => fetchEmployees();
+    const refresh = () => {
+      fetchEmployees();
+    };
     window.addEventListener('monthly-recap-imported', refresh);
     window.addEventListener('storage', refresh);
+    window.addEventListener('employee-added', refresh);
+    window.addEventListener('employee-deleted', refresh);
     return () => {
       window.removeEventListener('monthly-recap-imported', refresh);
       window.removeEventListener('storage', refresh);
+      window.removeEventListener('employee-added', refresh);
+      window.removeEventListener('employee-deleted', refresh);
     };
-  }, []);
+  }, [refreshKey]);
 
   // ========== ADD EMPLOYEE ==========
   const handleAddEmployee = async () => {
@@ -188,12 +294,7 @@ const Employee: React.FC = () => {
       workforceType: newEmployee.workforceType,
       gender: newEmployee.gender,
       htHours: newEmployee.htHours,
-      overtime25: newEmployee.overtime25,
-      overtime50: newEmployee.overtime50,
-      overtime100: newEmployee.overtime100,
       nightHours: newEmployee.nightHours,
-      absenceDays: newEmployee.absenceDays,
-      absenceHours: newEmployee.absenceHours,
     };
 
     try {
@@ -204,13 +305,19 @@ const Employee: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Erreur serveur');
+      
+      // Rafraîchir la liste immédiatement
       await fetchEmployees();
+      
+      // Déclencher un événement pour les autres composants
+      window.dispatchEvent(new Event('employee-added'));
+      
       setShowAddModal(false);
       setNewEmployee({
         prenom: '', nom: '', id: '', matricule: '', position: '', department: '', status: 'Actif',
-        age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, overtime25: 0, 
-        overtime50: 0, overtime100: 0, nightHours: 0, absenceDays: 0, absenceHours: 0,
+        age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, nightHours: 0,
       });
+      
     } catch (err: any) {
       alert(`Erreur lors de l'ajout: ${err.message}`);
     }
@@ -233,6 +340,11 @@ const Employee: React.FC = () => {
       status: emp.status || 'Actif',
       age: emp.age || 25,
       joinDate: emp.joinDate || '',
+      regime: emp.regime || '',
+      workforceType: emp.workforceType || '',
+      gender: emp.gender || '',
+      htHours: emp.htHours || 0,
+      nightHours: emp.nightHours || 0,
     });
     setShowEditModal(true);
   };
@@ -253,12 +365,7 @@ const Employee: React.FC = () => {
       workforceType: editForm.workforceType,
       gender: editForm.gender,
       htHours: editForm.htHours,
-      overtime25: editForm.overtime25,
-      overtime50: editForm.overtime50,
-      overtime100: editForm.overtime100,
       nightHours: editForm.nightHours,
-      absenceDays: editForm.absenceDays,
-      absenceHours: editForm.absenceHours,
     };
     
     try {
@@ -272,6 +379,7 @@ const Employee: React.FC = () => {
         throw new Error(errData.message);
       }
       await fetchEmployees();
+      window.dispatchEvent(new Event('employee-added'));
       setShowEditModal(false);
       setEditingEmployee(null);
     } catch (err: any) {
@@ -279,7 +387,7 @@ const Employee: React.FC = () => {
     }
   };
 
-  // ========== DELETE EMPLOYEE ==========
+  // ========== DELETE EMPLOYEE (individual) ==========
   const handleDeleteEmployee = async (id: string, fromRecap: boolean = false) => {
     if (!window.confirm('Supprimer cet employé ?')) return;
     try {
@@ -287,12 +395,13 @@ const Employee: React.FC = () => {
       const res = await fetch(endpoint, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       await fetchEmployees();
+      window.dispatchEvent(new Event('employee-deleted'));
     } catch (err) {
       alert('Erreur lors de la suppression');
     }
   };
 
-  // ========== DELETE WITH SELECTION ==========
+  // ========== DELETE WITH SELECTION (BULK) ==========
   const toggleSelectEmployee = (id: string, isImported: boolean) => {
     const key = `${isImported ? 'recap' : 'emp'}:${id}`;
     const newSelected = new Set(selectedForDelete);
@@ -329,39 +438,27 @@ const Employee: React.FC = () => {
       .map(id => id.replace('recap:', ''));
 
     try {
-      const promises: Promise<Response>[] = [];
+      const response = await fetch('/api/employees/bulk/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: regularIds, recapIds: importedIds }),
+      });
       
-      if (regularIds.length > 0) {
-        promises.push(
-          fetch('/api/employees/bulk/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: regularIds }),
-          })
-        );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Erreur lors de la suppression');
       }
       
-      if (importedIds.length > 0) {
-        promises.push(
-          fetch('/api/monthly-recap/bulk/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: importedIds }),
-          })
-        );
-      }
-
-      const responses = await Promise.all(promises);
-      for (const res of responses) {
-        if (!res.ok) throw new Error('Erreur lors de la suppression');
-      }
+      const result = await response.json();
+      alert(result.message);
       
       setSelectedForDelete(new Set());
       setShowDeleteConfirm(false);
       await fetchEmployees();
-      alert('Suppression effectuée avec succès');
-    } catch (err) {
-      alert('Erreur lors de la suppression');
+      window.dispatchEvent(new Event('employee-deleted'));
+      
+    } catch (err: any) {
+      alert(err.message || 'Erreur lors de la suppression');
     }
   };
 
@@ -390,9 +487,9 @@ const Employee: React.FC = () => {
 
   // ========== STATISTICS ==========
   const total = employees.length;
-  const actifs = employees.filter(e => e.status === 'Actif').length;
-  const totalHtHours = employees.reduce((sum, e) => sum + (e.htHours || 0), 0);
-  const totalNightHours = employees.reduce((sum, e) => sum + (e.nightHours || 0), 0);
+  const totalMensuel = employees.filter(e => e.regime?.toLowerCase() === 'mensuel').length;
+  const totalHoraire = employees.filter(e => e.regime?.toLowerCase() === 'horaire').length;
+  const totalJournalier = employees.filter(e => e.regime?.toLowerCase() === 'journalier').length;
 
   // ========== SAFE FILTER ==========
   const filteredEmployees = employees.filter(emp => {
@@ -420,9 +517,9 @@ const Employee: React.FC = () => {
 
         <div className="stats-cards">
           <div className="stat-card"><div className="stat-value">{total}</div><div className="stat-label">TOTAL</div></div>
-          <div className="stat-card"><div className="stat-value">{actifs}</div><div className="stat-label">ACTIFS</div></div>
-          <div className="stat-card"><div className="stat-value">{totalHtHours.toFixed(1)}</div><div className="stat-label">H. T</div></div>
-          <div className="stat-card"><div className="stat-value">{totalNightHours.toFixed(1)}</div><div className="stat-label">H. NUIT</div></div>
+          <div className="stat-card"><div className="stat-value">{totalMensuel}</div><div className="stat-label">MENSUEL</div></div>
+          <div className="stat-card"><div className="stat-value">{totalHoraire}</div><div className="stat-label">HORAIRE</div></div>
+          <div className="stat-card"><div className="stat-value">{totalJournalier}</div><div className="stat-label">JOURNALIER</div></div>
         </div>
 
         <div className="toolbar">
@@ -431,10 +528,10 @@ const Employee: React.FC = () => {
             placeholder="Rechercher par nom, matricule ou poste"
             className="search-input"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchTermChange(e.target.value)}
           />
           <div className="filters">
-            <select className="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="status-filter" value={statusFilter} onChange={(e) => handleStatusFilterChange(e.target.value)}>
               <option>Tous les statuts</option><option>Actif</option><option>En congé</option><option>Absent</option>
             </select>
             <label className="btn-import">
@@ -467,13 +564,6 @@ const Employee: React.FC = () => {
                 <th>Type d'effectif</th>
                 <th>Genre</th>
                 <th>Date d'embauche</th>
-                <th>H. T</th>
-                <th>25 %</th>
-                <th>50 %</th>
-                <th>100 %</th>
-                <th>H. NUIT</th>
-                <th>ABS./jour</th>
-                <th>Abs. hours</th>
                 <th>Matricule</th>
                 <th>Actions</th>
               </tr>
@@ -498,29 +588,17 @@ const Employee: React.FC = () => {
                   <td>{emp.workforceType || '-'}</td>
                   <td>{emp.gender || '-'}</td>
                   <td>{emp.joinDate || '-'}</td>
-                  <td>{emp.htHours || 0}</td>
-                  <td>{emp.overtime25 || 0}</td>
-                  <td>{emp.overtime50 || 0}</td>
-                  <td>{emp.overtime100 || 0}</td>
-                  <td>{emp.nightHours || 0}</td>
-                  <td>{emp.absenceDays || 0}</td>
-                  <td>{emp.absenceHours || 0}</td>
                   <td>{emp.matricule}</td>
                   <td>
-                    {emp.fromRecap ? (
-                      <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id, emp.fromRecap)}>🗑️</button>
-                    ) : (
-                      <>
-                        <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
-                        <button className="action-btn delete" onClick={() => handleDeleteEmployee(emp.id, emp.fromRecap)}>🗑️</button>
-                      </>
-                    )}
+                    <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
                   </td>
                 </tr>
               ))}
               {filteredEmployees.length === 0 && (
                 <tr>
-                  <td colSpan={16} style={{ textAlign: 'center', padding: '2rem' }}>Aucun employé trouvé.</td>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>
+                    Aucun employé trouvé.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -528,7 +606,7 @@ const Employee: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Modal with separate Nom field */}
+      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -541,7 +619,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Prénom" 
                   value={newEmployee.prenom} 
-                  onChange={e => setNewEmployee({...newEmployee, prenom: e.target.value})} 
+                  onChange={(e) => handleNewPrenomChange(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -550,7 +628,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Nom" 
                   value={newEmployee.nom} 
-                  onChange={e => setNewEmployee({...newEmployee, nom: e.target.value})} 
+                  onChange={(e) => handleNewNomChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -561,7 +639,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="ID" 
                   value={newEmployee.id} 
-                  onChange={e => setNewEmployee({...newEmployee, id: e.target.value})} 
+                  onChange={(e) => handleNewIdChange(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -570,7 +648,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Matricule" 
                   value={newEmployee.matricule} 
-                  onChange={e => setNewEmployee({...newEmployee, matricule: e.target.value})} 
+                  onChange={(e) => handleNewMatriculeChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -581,7 +659,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Poste" 
                   value={newEmployee.position} 
-                  onChange={e => setNewEmployee({...newEmployee, position: e.target.value})} 
+                  onChange={(e) => handleNewPositionChange(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -590,7 +668,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Département" 
                   value={newEmployee.department} 
-                  onChange={e => setNewEmployee({...newEmployee, department: e.target.value})} 
+                  onChange={(e) => handleNewDepartmentChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -599,7 +677,7 @@ const Employee: React.FC = () => {
                 <label>Status</label>
                 <select 
                   value={newEmployee.status} 
-                  onChange={e => setNewEmployee({...newEmployee, status: e.target.value as EmployeeStatus})}
+                  onChange={(e) => handleNewStatusChange(e.target.value as EmployeeStatus)}
                 >
                   <option>Actif</option>
                   <option>En congé</option>
@@ -611,7 +689,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="number" 
                   value={newEmployee.age} 
-                  onChange={e => setNewEmployee({...newEmployee, age: parseInt(e.target.value)})} 
+                  onChange={(e) => handleNewAgeChange(parseInt(e.target.value))} 
                 />
               </div>
             </div>
@@ -621,19 +699,22 @@ const Employee: React.FC = () => {
                 <input 
                   type="date" 
                   value={newEmployee.joinDate} 
-                  onChange={e => setNewEmployee({...newEmployee, joinDate: e.target.value})} 
+                  onChange={(e) => handleNewJoinDateChange(e.target.value)} 
                 />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label>Régime</label>
-                <input 
-                  type="text" 
-                  placeholder="Régime" 
+                <select 
                   value={newEmployee.regime} 
-                  onChange={e => setNewEmployee({...newEmployee, regime: e.target.value})} 
-                />
+                  onChange={(e) => handleNewRegimeChange(e.target.value)}
+                >
+                  <option value="">Sélectionner</option>
+                  <option value="Mensuel">Mensuel</option>
+                  <option value="Horaire">Horaire</option>
+                  <option value="Journalier">Journalier</option>
+                </select>
               </div>
               <div className="form-group">
                 <label>Type d'effectif</label>
@@ -641,7 +722,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Type d'effectif" 
                   value={newEmployee.workforceType} 
-                  onChange={e => setNewEmployee({...newEmployee, workforceType: e.target.value})} 
+                  onChange={(e) => handleNewWorkforceTypeChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -650,7 +731,7 @@ const Employee: React.FC = () => {
                 <label>Genre</label>
                 <select 
                   value={newEmployee.gender} 
-                  onChange={e => setNewEmployee({...newEmployee, gender: e.target.value})}
+                  onChange={(e) => handleNewGenderChange(e.target.value)}
                 >
                   <option value="">Sélectionner</option>
                   <option value="M">Homme</option>
@@ -663,67 +744,18 @@ const Employee: React.FC = () => {
                   type="number" 
                   placeholder="0" 
                   value={newEmployee.htHours} 
-                  onChange={e => setNewEmployee({...newEmployee, htHours: parseFloat(e.target.value) || 0})} 
+                  onChange={(e) => handleNewHtHoursChange(parseFloat(e.target.value) || 0)} 
                 />
               </div>
             </div>
             <div className="form-row">
-              <div className="form-group">
-                <label>25% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={newEmployee.overtime25} 
-                  onChange={e => setNewEmployee({...newEmployee, overtime25: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>50% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={newEmployee.overtime50} 
-                  onChange={e => setNewEmployee({...newEmployee, overtime50: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>100% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={newEmployee.overtime100} 
-                  onChange={e => setNewEmployee({...newEmployee, overtime100: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
               <div className="form-group">
                 <label>Night Hours (H. NUIT)</label>
                 <input 
                   type="number" 
                   placeholder="0" 
                   value={newEmployee.nightHours} 
-                  onChange={e => setNewEmployee({...newEmployee, nightHours: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Absence Days</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={newEmployee.absenceDays} 
-                  onChange={e => setNewEmployee({...newEmployee, absenceDays: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>Absence Hours</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={newEmployee.absenceHours} 
-                  onChange={e => setNewEmployee({...newEmployee, absenceHours: parseFloat(e.target.value) || 0})} 
+                  onChange={(e) => handleNewNightHoursChange(parseFloat(e.target.value) || 0)} 
                 />
               </div>
             </div>
@@ -735,7 +767,7 @@ const Employee: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal with separate Nom field */}
+      {/* Edit Modal */}
       {showEditModal && editingEmployee && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -747,7 +779,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="text" 
                   value={editForm.prenom} 
-                  onChange={e => setEditForm({...editForm, prenom: e.target.value})} 
+                  onChange={(e) => handleEditPrenomChange(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -755,7 +787,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="text" 
                   value={editForm.nom} 
-                  onChange={e => setEditForm({...editForm, nom: e.target.value})} 
+                  onChange={(e) => handleEditNomChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -769,7 +801,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="text" 
                   value={editForm.matricule} 
-                  onChange={e => setEditForm({...editForm, matricule: e.target.value})} 
+                  onChange={(e) => handleEditMatriculeChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -779,7 +811,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="text" 
                   value={editForm.position} 
-                  onChange={e => setEditForm({...editForm, position: e.target.value})} 
+                  onChange={(e) => handleEditPositionChange(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -787,7 +819,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="text" 
                   value={editForm.department} 
-                  onChange={e => setEditForm({...editForm, department: e.target.value})} 
+                  onChange={(e) => handleEditDepartmentChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -796,7 +828,7 @@ const Employee: React.FC = () => {
                 <label>Status</label>
                 <select 
                   value={editForm.status} 
-                  onChange={e => setEditForm({...editForm, status: e.target.value as EmployeeStatus})}
+                  onChange={(e) => handleEditStatusChange(e.target.value as EmployeeStatus)}
                 >
                   <option>Actif</option>
                   <option>En congé</option>
@@ -808,7 +840,7 @@ const Employee: React.FC = () => {
                 <input 
                   type="number" 
                   value={editForm.age} 
-                  onChange={e => setEditForm({...editForm, age: parseInt(e.target.value)})} 
+                  onChange={(e) => handleEditAgeChange(parseInt(e.target.value))} 
                 />
               </div>
             </div>
@@ -818,19 +850,22 @@ const Employee: React.FC = () => {
                 <input 
                   type="date" 
                   value={editForm.joinDate} 
-                  onChange={e => setEditForm({...editForm, joinDate: e.target.value})} 
+                  onChange={(e) => handleEditJoinDateChange(e.target.value)} 
                 />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label>Régime</label>
-                <input 
-                  type="text" 
-                  placeholder="Régime" 
+                <select 
                   value={editForm.regime} 
-                  onChange={e => setEditForm({...editForm, regime: e.target.value})} 
-                />
+                  onChange={(e) => handleEditRegimeChange(e.target.value)}
+                >
+                  <option value="">Sélectionner</option>
+                  <option value="Mensuel">Mensuel</option>
+                  <option value="Horaire">Horaire</option>
+                  <option value="Journalier">Journalier</option>
+                </select>
               </div>
               <div className="form-group">
                 <label>Type d'effectif</label>
@@ -838,7 +873,7 @@ const Employee: React.FC = () => {
                   type="text" 
                   placeholder="Type d'effectif" 
                   value={editForm.workforceType} 
-                  onChange={e => setEditForm({...editForm, workforceType: e.target.value})} 
+                  onChange={(e) => handleEditWorkforceTypeChange(e.target.value)} 
                 />
               </div>
             </div>
@@ -847,7 +882,7 @@ const Employee: React.FC = () => {
                 <label>Genre</label>
                 <select 
                   value={editForm.gender} 
-                  onChange={e => setEditForm({...editForm, gender: e.target.value})}
+                  onChange={(e) => handleEditGenderChange(e.target.value)}
                 >
                   <option value="">Sélectionner</option>
                   <option value="M">Homme</option>
@@ -860,67 +895,18 @@ const Employee: React.FC = () => {
                   type="number" 
                   placeholder="0" 
                   value={editForm.htHours} 
-                  onChange={e => setEditForm({...editForm, htHours: parseFloat(e.target.value) || 0})} 
+                  onChange={(e) => handleEditHtHoursChange(parseFloat(e.target.value) || 0)} 
                 />
               </div>
             </div>
             <div className="form-row">
-              <div className="form-group">
-                <label>25% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={editForm.overtime25} 
-                  onChange={e => setEditForm({...editForm, overtime25: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>50% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={editForm.overtime50} 
-                  onChange={e => setEditForm({...editForm, overtime50: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>100% Overtime</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={editForm.overtime100} 
-                  onChange={e => setEditForm({...editForm, overtime100: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
               <div className="form-group">
                 <label>Night Hours (H. NUIT)</label>
                 <input 
                   type="number" 
                   placeholder="0" 
                   value={editForm.nightHours} 
-                  onChange={e => setEditForm({...editForm, nightHours: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Absence Days</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={editForm.absenceDays} 
-                  onChange={e => setEditForm({...editForm, absenceDays: parseFloat(e.target.value) || 0})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>Absence Hours</label>
-                <input 
-                  type="number" 
-                  placeholder="0" 
-                  value={editForm.absenceHours} 
-                  onChange={e => setEditForm({...editForm, absenceHours: parseFloat(e.target.value) || 0})} 
+                  onChange={(e) => handleEditNightHoursChange(parseFloat(e.target.value) || 0)} 
                 />
               </div>
             </div>
