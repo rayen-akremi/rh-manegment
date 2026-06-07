@@ -180,7 +180,7 @@ const Dashboard: React.FC = () => {
     {
       title: "TAUX D'ABSENCE",
       value: `${kpi.absenceRate}%`,
-      trend: "+0.6",
+
       trendUp: true,
       icon: <Calendar size={24} />,
       color: "#ef4444"

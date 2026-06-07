@@ -111,10 +111,8 @@ const syncMonthlyRecapToCollections = async () => {
     const recaps = await MonthlyRecap.find();
     
     for (const recap of recaps) {
-      // Generate employee_id from matricule
       const employee_id = recap.matricule || recap.employeeName?.replace(/\s+/g, '_') || `EMP_${Date.now()}`;
       
-      // Create or update Employe record
       const [prenom = '', nom = ''] = (recap.employeeName || '').split(/\s+/, 2);
       
       await Employe.findOneAndUpdate(
@@ -143,7 +141,6 @@ const syncMonthlyRecapToCollections = async () => {
         { upsert: true }
       );
 
-      // Create Absence record if there are absence days
       if (recap.absenceDays > 0) {
         const now = new Date();
         const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -164,7 +161,6 @@ const syncMonthlyRecapToCollections = async () => {
         );
       }
 
-      // Create Workload record
       const totalOvertimeHours = (recap.overtime25 || 0) + (recap.overtime50 || 0) + (recap.overtime100 || 0);
       
       await Workload.findOneAndUpdate(
@@ -206,7 +202,6 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-// Sync endpoint to populate Employe, Absence, and Workload from MonthlyRecap
 router.post('/sync', async (req, res) => {
   try {
     const result = await syncMonthlyRecapToCollections();
@@ -264,7 +259,6 @@ router.post('/import', upload.single('file'), async (req, res) => {
       status: 'Success'
     });
 
-    // Sync data to other collections
     await syncMonthlyRecapToCollections();
 
     res.status(201).json({
@@ -278,28 +272,43 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 });
 
+// ========== DELETE SINGLE IMPORTED EMPLOYEE ==========
 router.delete('/:matricule', async (req, res) => {
   try {
     const { matricule } = req.params;
+    console.log('🔍 [MONTHLY-RECAP] Suppression unique:', matricule);
     const result = await MonthlyRecap.findOneAndDelete({ matricule });
     if (!result) {
       return res.status(404).json({ message: 'Employé non trouvé' });
     }
-    res.json({ message: 'Employé supprimé' });
+    console.log('✅ [MONTHLY-RECAP] Supprimé:', matricule);
+    res.json({ success: true, message: 'Employé supprimé' });
   } catch (error) {
+    console.error('❌ [MONTHLY-RECAP] Erreur:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
+// ========== DELETE MULTIPLE IMPORTED EMPLOYEES ==========
 router.post('/bulk/delete', async (req, res) => {
   try {
     const { ids } = req.body;
+    console.log('🔍 [MONTHLY-RECAP] Suppression multiple - IDs reçus:', ids);
+    
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: 'IDs manquants' });
     }
+    
     const result = await MonthlyRecap.deleteMany({ matricule: { $in: ids } });
-    res.json({ message: `${result.deletedCount} employé(s) supprimé(s)` });
+    console.log(`✅ [MONTHLY-RECAP] ${result.deletedCount} employé(s) importé(s) supprimé(s)`);
+    
+    res.json({ 
+      success: true,
+      message: `${result.deletedCount} employé(s) importé(s) supprimé(s)`,
+      deletedCount: result.deletedCount 
+    });
   } catch (error) {
+    console.error('❌ [MONTHLY-RECAP] Erreur:', error);
     res.status(500).json({ message: error.message });
   }
 });

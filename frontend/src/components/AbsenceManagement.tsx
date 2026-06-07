@@ -5,7 +5,7 @@ import {
 import Navbar from './Navbar';
 import '../style/AbsenceManagement.css';
 
-type AbsenceType = 'Sick leave' | 'Vacation' | 'Maternity' | 'Other';
+type AbsenceType = 'Congé maladie' | 'Congé payé' | 'Congé maternité' | 'Autre';
 
 interface AbsenceRecord {
   id: string;
@@ -26,6 +26,23 @@ interface Employee {
   matricule: string;
 }
 
+// ✅ Composant Toast pour notification automatique
+const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="custom-toast">
+      <span className="toast-icon">✅</span>
+      <span className="toast-message">{message}</span>
+    </div>
+  );
+};
+
 const AbsenceManagement: React.FC = () => {
   const [absences, setAbsences] = useState<AbsenceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -33,11 +50,14 @@ const AbsenceManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('All departments');
-  const [typeFilter, setTypeFilter] = useState('All types');
+  const [departmentFilter, setDepartmentFilter] = useState('Tous les départements');
+  const [typeFilter, setTypeFilter] = useState('Tous les types');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AbsenceRecord | null>(null);
+  
+  // ✅ État pour le message de notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   // Searchable select states
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
@@ -49,7 +69,7 @@ const AbsenceManagement: React.FC = () => {
     employeeId: '',
     employee: '',
     department: '',
-    type: 'Sick leave' as AbsenceType,
+    type: 'Congé maladie' as AbsenceType,
     days: 1,
     startDate: '',
   });
@@ -57,10 +77,19 @@ const AbsenceManagement: React.FC = () => {
     employeeId: '',
     employee: '',
     department: '',
-    type: 'Sick leave' as AbsenceType,
+    type: 'Congé maladie' as AbsenceType,
     days: 1,
     startDate: '',
   });
+
+  // ✅ Afficher le message stocké après le rafraîchissement
+  useEffect(() => {
+    const storedMessage = sessionStorage.getItem('successMessage');
+    if (storedMessage) {
+      setToastMessage(storedMessage);
+      sessionStorage.removeItem('successMessage');
+    }
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -73,7 +102,7 @@ const AbsenceManagement: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter employees based on search term (search by name, id, or matricule)
+  // Filter employees based on search term
   const filteredEmployees = employees.filter(emp => {
     const searchLower = employeeSearchTerm.toLowerCase();
     return emp.name.toLowerCase().includes(searchLower) || 
@@ -101,15 +130,15 @@ const AbsenceManagement: React.FC = () => {
       
       const employeeList: Employee[] = employeeArray.map((emp: any) => ({
         id: emp.employee_id || emp.matricule || emp.id,
-        name: `${emp.prenom || ''} ${emp.nom || ''}`.trim() || emp.name || `Employee ${emp.matricule || emp.employee_id}`,
-        department: emp.departement || emp.department || 'Unknown',
+        name: `${emp.prenom || ''} ${emp.nom || ''}`.trim() || emp.name || `Employé ${emp.matricule || emp.employee_id}`,
+        department: emp.departement || emp.department || 'Inconnu',
         matricule: emp.matricule || emp.employee_id || emp.id || ''
       }));
       
-      console.log('Loaded employees:', employeeList);
+      console.log('Employés chargés:', employeeList);
       setEmployees(employeeList);
     } catch (err) {
-      console.error('Error fetching employees:', err);
+      console.error('Erreur chargement employés:', err);
     }
   };
 
@@ -128,9 +157,9 @@ const AbsenceManagement: React.FC = () => {
         const recapAbsences: AbsenceRecord[] = recapRows.map((item: any) => ({
           id: item._id || item.matricule,
           employeeId: item.matricule || '',
-          employee: item.employeeName || 'Unknown',
-          department: item.department || 'Unknown',
-          type: 'Other',
+          employee: item.employeeName || 'Inconnu',
+          department: item.department || 'Inconnu',
+          type: 'Autre',
           days: item.absenceDays || 0,
           hours: item.absenceHours || 0,
           startDate: '',
@@ -158,9 +187,16 @@ const AbsenceManagement: React.FC = () => {
       const formattedAbsences: AbsenceRecord[] = absencesArray.map((item: any) => ({
         id: item.absence_id || item._id || `temp-${Date.now()}`,
         employeeId: item.employee_id || '',
-        employee: item.name || item.employee || 'Unknown',
-        department: item.department || 'Unknown',
-        type: (item.type as AbsenceType) || 'Other',
+        employee: item.name || item.employee || 'Inconnu',
+        department: item.department || 'Inconnu',
+        type: (() => {
+          switch (item.type) {
+            case 'Sick leave': return 'Congé maladie';
+            case 'Vacation': return 'Congé payé';
+            case 'Maternity': return 'Congé maternité';
+            default: return 'Autre';
+          }
+        })(),
         days: item.days || 0,
         hours: (item.days || 0) * 8,
         startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
@@ -169,7 +205,7 @@ const AbsenceManagement: React.FC = () => {
       setAbsences(formattedAbsences);
       setError('');
     } catch (err) {
-      console.error('Error fetching absences:', err);
+      console.error('Erreur chargement absences:', err);
       setError('Impossible de charger les absences');
       setAbsences([]);
     } finally {
@@ -177,7 +213,7 @@ const AbsenceManagement: React.FC = () => {
     }
   };
 
-  // Rafraîchir les données (utilisé après suppression d'employé)
+  // Refresh data
   const refreshData = () => {
     fetchEmployees();
     fetchAbsences();
@@ -187,9 +223,8 @@ const AbsenceManagement: React.FC = () => {
     fetchEmployees();
     fetchAbsences();
     
-    // Écouter l'événement de suppression d'employé
     const handleEmployeeDeleted = () => {
-      console.log('Employee deleted event received - refreshing absences');
+      console.log('Événement suppression employé reçu - rafraîchissement des absences');
       fetchAbsences();
     };
     
@@ -236,16 +271,22 @@ const AbsenceManagement: React.FC = () => {
 
   // ========== ADD ABSENCE ==========
   const handleAddAbsence = async () => {
-    if (!newAbsence.employeeId.trim()) { alert("Veuillez sélectionner un employé"); return; }
-    if (newAbsence.days < 1) { alert("Les jours doivent être >= 1"); return; }
-    if (!newAbsence.startDate) { alert("La date est requise"); return; }
+    if (!newAbsence.employeeId.trim()) { setToastMessage("⚠️ Veuillez sélectionner un employé"); return; }
+    if (newAbsence.days < 1) { setToastMessage("⚠️ Les jours doivent être >= 1"); return; }
+    if (!newAbsence.startDate) { setToastMessage("⚠️ La date est requise"); return; }
+
+    // Convertir le type en anglais pour l'API
+    let typeEn = 'Other';
+    if (newAbsence.type === 'Congé maladie') typeEn = 'Sick leave';
+    else if (newAbsence.type === 'Congé payé') typeEn = 'Vacation';
+    else if (newAbsence.type === 'Congé maternité') typeEn = 'Maternity';
 
     const payload = {
       absence_id: `ABS${Date.now()}`,
       employee_id: newAbsence.employeeId,
       name: newAbsence.employee,
       department: newAbsence.department,
-      type: newAbsence.type,
+      type: typeEn,
       days: newAbsence.days,
       startDate: newAbsence.startDate,
     };
@@ -257,24 +298,33 @@ const AbsenceManagement: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Erreur ajout');
-      await fetchAbsences();
+      
+      const successMsg = ` Absence ajoutée avec succès pour ${newAbsence.employee} (${newAbsence.days} jour(s))`;
+      sessionStorage.setItem('successMessage', successMsg);
+      
       setShowAddModal(false);
       setSelectedEmployee(null);
-      setNewAbsence({ employeeId: '', employee: '', department: '', type: 'Sick leave', days: 1, startDate: '' });
+      setNewAbsence({ employeeId: '', employee: '', department: '', type: 'Congé maladie', days: 1, startDate: '' });
+      
+      window.location.reload();
+      
     } catch (err) {
-      alert('Erreur lors de l\'ajout');
+      setToastMessage("❌ Erreur lors de l'ajout");
     }
   };
 
   // ========== DELETE ABSENCE ==========
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Supprimer cet enregistrement ?')) return;
+    if (!window.confirm('❌ Supprimer cet enregistrement ?')) return;
     try {
       const response = await fetch(`/api/absences/${id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Erreur suppression');
-      await fetchAbsences();
+      
+      sessionStorage.setItem('successMessage', '🗑️ Absence supprimée avec succès');
+      window.location.reload();
+      
     } catch (err) {
-      alert('Erreur lors de la suppression');
+      setToastMessage("❌ Erreur lors de la suppression");
     }
   };
 
@@ -285,7 +335,7 @@ const AbsenceManagement: React.FC = () => {
       employeeId: record.employeeId || '',
       employee: record.employee || '',
       department: record.department || '',
-      type: record.type || 'Sick leave',
+      type: record.type || 'Congé maladie',
       days: record.days || 1,
       startDate: record.startDate || '',
     });
@@ -295,10 +345,16 @@ const AbsenceManagement: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editingRecord) return;
     
+    // Convertir le type en anglais pour l'API
+    let typeEn = 'Other';
+    if (editForm.type === 'Congé maladie') typeEn = 'Sick leave';
+    else if (editForm.type === 'Congé payé') typeEn = 'Vacation';
+    else if (editForm.type === 'Congé maternité') typeEn = 'Maternity';
+    
     const payload = {
       name: editForm.employee,
       department: editForm.department,
-      type: editForm.type,
+      type: typeEn,
       days: editForm.days,
       startDate: editForm.startDate,
     };
@@ -310,21 +366,26 @@ const AbsenceManagement: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Erreur modification');
-      await fetchAbsences();
+      
+      sessionStorage.setItem('successMessage', `✏️ Absence modifiée avec succès pour ${editForm.employee}`);
+      
       setShowEditModal(false);
       setEditingRecord(null);
+      
+      window.location.reload();
+      
     } catch (err) {
-      alert('Erreur lors de la modification');
+      setToastMessage("❌ Erreur lors de la modification");
     }
   };
 
   // ========== EXPORT CSV ==========
   const handleExport = () => {
     if (absences.length === 0) {
-      alert('Aucune donnée à exporter');
+      setToastMessage(" Aucune donnée à exporter");
       return;
     }
-    const headers = ['Employee ID', 'Employee', 'Department', 'ABS./jour'];
+    const headers = ['ID Employé', 'Employé', 'Département', 'Jours d\'absence'];
     const rows = absences.map(a => [
       a.employeeId || '',
       a.employee || '',
@@ -339,6 +400,7 @@ const AbsenceManagement: React.FC = () => {
     a.download = 'absence_records.csv';
     a.click();
     URL.revokeObjectURL(url);
+    setToastMessage(" Rapport exporté avec succès");
   };
 
   // ========== CALCULATIONS ==========
@@ -359,8 +421,8 @@ const AbsenceManagement: React.FC = () => {
   const employeesMoreThan3Absences = new Set(absences.filter(a => (a.days || 0) > 3).map(a => a.employee)).size;
 
   const departmentList = Array.from(new Set(absences.map(a => a.department).filter(Boolean))).sort();
-  const departments = ['All departments', ...departmentList];
-  const types = ['All types', 'Sick leave', 'Vacation', 'Maternity', 'Other'];
+  const departments = ['Tous les départements', ...departmentList];
+  const types = ['Tous les types', 'Congé maladie', 'Congé payé', 'Congé maternité', 'Autre'];
 
   const filteredAbsences = absences.filter(rec => {
     if (!rec) return false;
@@ -368,54 +430,55 @@ const AbsenceManagement: React.FC = () => {
     const matchSearch = (rec.employee || '').toLowerCase().includes(searchLower) ||
                         (rec.department || '').toLowerCase().includes(searchLower) ||
                         (rec.employeeId || '').toLowerCase().includes(searchLower);
-    const matchDept = departmentFilter === 'All departments' || rec.department === departmentFilter;
-    const matchType = typeFilter === 'All types' || rec.type === typeFilter;
+    const matchDept = departmentFilter === 'Tous les départements' || rec.department === departmentFilter;
+    const matchType = typeFilter === 'Tous les types' || rec.type === typeFilter;
     return matchSearch && matchDept && matchType;
   });
 
-  if (loading) return <div style={{ marginLeft: '260px', padding: '2rem' }}>Chargement des absences...</div>;
-  if (error) return <div style={{ color: 'red', marginLeft: '260px', padding: '2rem' }}>{error}</div>;
+  if (loading) return <div style={{ marginLeft: '260px', padding: '2rem' }}> Chargement des absences...</div>;
+  if (error) return <div style={{ color: 'red', marginLeft: '260px', padding: '2rem' }}>❌ {error}</div>;
 
   return (
     <div>
       <Navbar />
       <div className="absence-page">
         <div className="page-header">
-          <h1>Track & analyze absences</h1>
-          <p>Monitor employee absence patterns, surface AI predictions, and export reports for HR review.</p>
+          <h1> Suivi et analyse des absences</h1>
+          <p>Analysez les tendances d'absence, recevez des prédictions IA et exportez des rapports RH.</p>
         </div>
 
-        {/* KPI Cards */}
+        {/* ✅ Toast Notification */}
+        {toastMessage && (
+          <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+        )}
+
+        {/* KPI Cards - Sans "vs mois dernier" */}
         <div className="kpi-cards">
           <div className="kpi-card">
-            <div className="kpi-title">OVERALL ABSENCE RATE</div>
+            <div className="kpi-title">TAUX D'ABSENCE GLOBAL</div>
             <div className="kpi-value">{overallAbsenceRate}%</div>
-            <div className="kpi-delta">vs last month</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title">TOTAL ABSENCE DAYS</div>
+            <div className="kpi-title">TOTAL JOURS D'ABSENCE</div>
             <div className="kpi-value">{totalAbsenceDays}</div>
-            <div className="kpi-delta">vs last month</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title">ABSENCE HOURS</div>
+            <div className="kpi-title">HEURES D'ABSENCE</div>
             <div className="kpi-value">{totalAbsenceHours.toFixed(1)} h</div>
-            <div className="kpi-delta">ABS./jour x 8h</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title">&gt;3 ABSENCES (EMPLOYEES)</div>
+            <div className="kpi-title">&gt;3 ABSENCES (EMPLOYÉS)</div>
             <div className="kpi-value">{employeesMoreThan3Absences}</div>
-            <div className="kpi-delta">vs last month</div>
           </div>
         </div>
 
         {/* Chart */}
         <div className="chart-section">
           <div className="chart-header">
-            <h2>Absence by department</h2>
+            <h2> Absences par département</h2>
             <div className="chart-buttons">
-              <button className="btn-add-absence" onClick={() => setShowAddModal(true)}>+ Add absence</button>
-              <button className="btn-export" onClick={handleExport}>📎 Export</button>
+              <button className="btn-add-absence" onClick={() => setShowAddModal(true)}>+ Ajouter absence</button>
+              <button className="btn-export" onClick={handleExport}>📎 Exporter</button>
             </div>
           </div>
           <div className="chart-container">
@@ -424,24 +487,24 @@ const AbsenceManagement: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="department" />
                 <YAxis />
-                <Tooltip formatter={(value) => `${value} hours`} />
+                <Tooltip formatter={(value) => `${value} heures`} />
                 <Legend />
-                <Bar dataKey="absences" fill="#8884d8" name="Absences (hours)" />
+                <Bar dataKey="absences" fill="#8884d8" name="Heures d'absence" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Table - WITHOUT Actions column */}
+        {/* Table */}
         <div className="records-section">
           <div className="records-header">
-            <h2>Absence records</h2>
-            <span className="record-count">{filteredAbsences.length} of {absences.length} records</span>
+            <h2> Liste des absences</h2>
+            <span className="record-count">{filteredAbsences.length} sur {absences.length} enregistrements</span>
           </div>
           <div className="filters-bar">
             <input
               type="text"
-              placeholder="Search employees, ID, departments..."
+              placeholder=" Rechercher employé, ID, département..."
               className="search-input"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -459,10 +522,10 @@ const AbsenceManagement: React.FC = () => {
             <table className="absence-table">
               <thead>
                 <tr>
-                  <th>Employee ID</th>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>ABS./jour</th>
+                  <th>ID Employé</th>
+                  <th>Employé</th>
+                  <th>Département</th>
+                  <th>Jours d'absence</th>
                 </tr>
               </thead>
               <tbody>
@@ -476,7 +539,7 @@ const AbsenceManagement: React.FC = () => {
                 ))}
                 {filteredAbsences.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="no-data">No absence records found.</td>
+                    <td colSpan={4} className="no-data">📭 Aucun enregistrement d'absence trouvé.</td>
                   </tr>
                 )}
               </tbody>
@@ -485,15 +548,14 @@ const AbsenceManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Modal with Searchable Employee Selector */}
+      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Add absence record</h2>
+            <h2> Ajouter une absence</h2>
             
-            {/* Searchable Employee Select */}
             <div className="form-group" ref={dropdownRef}>
-              <label>Select Employee *</label>
+              <label> Sélectionner un employé *</label>
               <div className="searchable-select">
                 <div 
                   className="select-input"
@@ -515,7 +577,7 @@ const AbsenceManagement: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    <span className="placeholder">Search by name, ID, or matricule...</span>
+                    <span className="placeholder"> Rechercher par nom, ID ou matricule...</span>
                   )}
                   <span className="dropdown-arrow">▼</span>
                 </div>
@@ -525,7 +587,7 @@ const AbsenceManagement: React.FC = () => {
                     <input
                       type="text"
                       className="dropdown-search"
-                      placeholder="Type name, ID, or matricule to search..."
+                      placeholder="Tapez le nom, l'ID ou le matricule..."
                       value={employeeSearchTerm}
                       onChange={(e) => setEmployeeSearchTerm(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -547,7 +609,7 @@ const AbsenceManagement: React.FC = () => {
                           </div>
                         ))
                       ) : (
-                        <div className="no-results">No employees found</div>
+                        <div className="no-results"> Aucun employé trouvé</div>
                       )}
                     </div>
                   </div>
@@ -558,15 +620,15 @@ const AbsenceManagement: React.FC = () => {
             {selectedEmployee && (
               <>
                 <div className="info-row">
-                  <span className="info-label">Department:</span>
+                  <span className="info-label"> Département:</span>
                   <span className="info-value">{newAbsence.department || '-'}</span>
                 </div>
                 <div className="info-row">
-                  <span className="info-label">Employee ID:</span>
+                  <span className="info-label"> ID Employé:</span>
                   <span className="info-value">{newAbsence.employeeId || '-'}</span>
                 </div>
                 <div className="info-row">
-                  <span className="info-label">Matricule:</span>
+                  <span className="info-label"> Matricule:</span>
                   <span className="info-value">{selectedEmployee.matricule || '-'}</span>
                 </div>
               </>
@@ -574,19 +636,19 @@ const AbsenceManagement: React.FC = () => {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Type</label>
+                <label>Type d'absence</label>
                 <select
                   value={newAbsence.type}
                   onChange={(e) => setNewAbsence({ ...newAbsence, type: e.target.value as AbsenceType })}
                 >
-                  <option>Sick leave</option>
-                  <option>Vacation</option>
-                  <option>Maternity</option>
-                  <option>Other</option>
+                  <option>Congé maladie</option>
+                  <option>Congé payé</option>
+                  <option>Congé maternité</option>
+                  <option>Autre</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Days</label>
+                <label> Nombre de jours</label>
                 <input
                   type="number"
                   min="1"
@@ -597,7 +659,7 @@ const AbsenceManagement: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Start date</label>
+                <label> Date de début</label>
                 <input
                   type="date"
                   value={newAbsence.startDate}
@@ -606,8 +668,8 @@ const AbsenceManagement: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleAddAbsence}>Add</button>
+              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Annuler</button>
+              <button className="btn-submit" onClick={handleAddAbsence}>Ajouter</button>
             </div>
           </div>
         </div>
@@ -617,32 +679,32 @@ const AbsenceManagement: React.FC = () => {
       {showEditModal && editingRecord && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Edit absence record</h2>
+            <h2>✏️ Modifier l'absence</h2>
             <div className="form-row">
               <div className="form-group">
-                <label>Employee</label>
+                <label>👤 Employé</label>
                 <input type="text" value={editForm.employee} readOnly disabled />
               </div>
               <div className="form-group">
-                <label>Department</label>
+                <label>🏢 Département</label>
                 <input type="text" value={editForm.department} readOnly disabled />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Type</label>
+                <label>📋 Type d'absence</label>
                 <select
                   value={editForm.type}
                   onChange={(e) => setEditForm({ ...editForm, type: e.target.value as AbsenceType })}
                 >
-                  <option>Sick leave</option>
-                  <option>Vacation</option>
-                  <option>Maternity</option>
-                  <option>Other</option>
+                  <option>Congé maladie</option>
+                  <option>Congé payé</option>
+                  <option>Congé maternité</option>
+                  <option>Autre</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Days</label>
+                <label>📅 Nombre de jours</label>
                 <input
                   type="number"
                   value={editForm.days}
@@ -652,7 +714,7 @@ const AbsenceManagement: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Start date</label>
+                <label>📆 Date de début</label>
                 <input
                   type="date"
                   value={editForm.startDate}
@@ -661,8 +723,8 @@ const AbsenceManagement: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleSaveEdit}>Save changes</button>
+              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Annuler</button>
+              <button className="btn-submit" onClick={handleSaveEdit}>Enregistrer</button>
             </div>
           </div>
         </div>

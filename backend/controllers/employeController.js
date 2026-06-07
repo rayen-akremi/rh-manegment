@@ -1,7 +1,7 @@
 const Employe = require('../models/Employe');
 const Absence = require('../models/Absence');
 const Workload = require('../models/Workload');
-const MonthlyRecap = require('../models/MonthlyRecap'); // AJOUTÉ : pour gérer les employés importés
+const MonthlyRecap = require('../models/MonthlyRecap');
 const TurnoverDeparture = require('../models/TurnoverDeparture');
 
 exports.getAllEmployees = async (req, res) => {
@@ -35,7 +35,11 @@ exports.updateEmployee = async (req, res) => {
     const updates = req.body;
     delete updates._id;
     delete updates.employee_id;
-    const updated = await Employe.findOneAndUpdate({ employee_id: id }, { $set: updates }, { new: true });
+    
+    let updated = await Employe.findOneAndUpdate({ employee_id: id }, { $set: updates }, { new: true });
+    if (!updated && id.match(/^[0-9a-fA-F]{24}$/)) {
+      updated = await Employe.findByIdAndUpdate(id, { $set: updates }, { new: true });
+    }
     if (!updated) return res.status(404).json({ message: 'Employé non trouvé' });
     res.json(updated);
   } catch (error) {
@@ -43,33 +47,58 @@ exports.updateEmployee = async (req, res) => {
   }
 };
 
-// ========== DELETE SINGLE EMPLOYEE (avec suppression des données liées) ==========
+// ========== DELETE SINGLE EMPLOYEE ==========
 exports.deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // 1. Vérifier si l'employé existe
-    const employee = await Employe.findOne({ employee_id: id });
+    console.log('🔍 [DELETE SINGLE] ID reçu:', id);
+    
+    let employee = await Employe.findOne({ employee_id: id });
+    let deleted = null;
+    let usedId = id;
+    
+    if (!employee && id.match(/^[0-9a-fA-F]{24}$/)) {
+      employee = await Employe.findById(id);
+      if (employee) {
+        usedId = employee.employee_id;
+        const absencesResult = await Absence.deleteMany({ employee_id: usedId });
+        const workloadsResult = await Workload.deleteMany({ employee_id: usedId });
+        const turnoverResult = await TurnoverDeparture.deleteMany({ employee_id: usedId });
+        deleted = await Employe.findByIdAndDelete(id);
+        
+        console.log(`✅ [DELETE SINGLE] Supprimé par _id: ${id}`);
+        
+        return res.json({ 
+          success: true,
+          message: 'Employé supprimé avec succès',
+          details: {
+            employee: usedId,
+            absencesSupprimees: absencesResult.deletedCount || 0,
+            workloadsSupprimees: workloadsResult.deletedCount || 0,
+            turnoverSupprimees: turnoverResult.deletedCount || 0
+          }
+        });
+      }
+    }
+    
     if (!employee) {
+      console.log('❌ [DELETE SINGLE] Employé non trouvé:', id);
       return res.status(404).json({ message: 'Employé non trouvé' });
     }
     
-    // 2. Supprimer toutes les absences liées à cet employé
     const absencesResult = await Absence.deleteMany({ employee_id: id });
-    
-    // 3. Supprimer toutes les charges de travail liées à cet employé
     const workloadsResult = await Workload.deleteMany({ employee_id: id });
-    
-    // 4. (Optionnel) Supprimer les enregistrements de turnover liés à cet employé
     const turnoverResult = await TurnoverDeparture.deleteMany({ employee_id: id });
+    deleted = await Employe.findOneAndDelete({ employee_id: id });
     
-    // 5. Supprimer l'employé lui-même
-    const deleted = await Employe.findOneAndDelete({ employee_id: id });
+    console.log(`✅ [DELETE SINGLE] Supprimé par employee_id: ${id}`);
     
     res.json({ 
-      message: 'Employé et ses données associées supprimés avec succès',
+      success: true,
+      message: 'Employé supprimé avec succès',
       details: {
-        employee: deleted.employee_id,
+        employee: id,
         absencesSupprimees: absencesResult.deletedCount || 0,
         workloadsSupprimees: workloadsResult.deletedCount || 0,
         turnoverSupprimees: turnoverResult.deletedCount || 0
@@ -77,15 +106,18 @@ exports.deleteEmployee = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erreur suppression:', error);
+    console.error('❌ [DELETE SINGLE] Erreur:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// ========== DELETE MULTIPLE EMPLOYEES (UNIFIED - gère aussi les employés importés) ==========
+// ========== DELETE MULTIPLE EMPLOYEES ==========
 exports.deleteMultipleEmployees = async (req, res) => {
   try {
     const { ids, recapIds } = req.body;
+    
+    console.log('🔍 [BULK DELETE] IDs reçus (normaux):', ids);
+    console.log('🔍 [BULK DELETE] IDs reçus (importés):', recapIds);
     
     let totalDeleted = 0;
     let absencesDeleted = 0;
@@ -93,11 +125,39 @@ exports.deleteMultipleEmployees = async (req, res) => {
     let turnoverDeleted = 0;
     let recapDeleted = 0;
     const deletedIds = [];
+    const notFoundIds = [];
     
     // 1. Supprimer les employés normaux (table employes)
     if (ids && Array.isArray(ids) && ids.length > 0) {
+      console.log(`📊 [BULK DELETE] Traitement de ${ids.length} employé(s) normal(aux)...`);
+      
       for (const id of ids) {
-        const employee = await Employe.findOne({ employee_id: id });
+        let employee = await Employe.findOne({ employee_id: id });
+        let deleted = null;
+        
+        if (!employee && id.match(/^[0-9a-fA-F]{24}$/)) {
+          employee = await Employe.findById(id);
+          if (employee) {
+            const absences = await Absence.deleteMany({ employee_id: employee.employee_id });
+            const workloads = await Workload.deleteMany({ employee_id: employee.employee_id });
+            const turnover = await TurnoverDeparture.deleteMany({ employee_id: employee.employee_id });
+            deleted = await Employe.findByIdAndDelete(id);
+            
+            if (deleted) {
+              absencesDeleted += absences.deletedCount || 0;
+              workloadsDeleted += workloads.deletedCount || 0;
+              turnoverDeleted += turnover.deletedCount || 0;
+              totalDeleted++;
+              deletedIds.push(id);
+              console.log(`  ✅ Supprimé par _id: ${id}`);
+            } else {
+              notFoundIds.push(id);
+              console.log(`  ❌ Non trouvé: ${id}`);
+            }
+            continue;
+          }
+        }
+        
         if (employee) {
           const absences = await Absence.deleteMany({ employee_id: id });
           const workloads = await Workload.deleteMany({ employee_id: id });
@@ -107,30 +167,53 @@ exports.deleteMultipleEmployees = async (req, res) => {
           workloadsDeleted += workloads.deletedCount || 0;
           turnoverDeleted += turnover.deletedCount || 0;
           
-          await Employe.findOneAndDelete({ employee_id: id });
+          deleted = await Employe.findOneAndDelete({ employee_id: id });
           totalDeleted++;
           deletedIds.push(id);
+          console.log(`  ✅ Supprimé par employee_id: ${id}`);
+        } else {
+          notFoundIds.push(id);
+          console.log(`  ❌ Non trouvé: ${id}`);
         }
       }
     }
     
     // 2. Supprimer les employés importés (table monthlyrecaps)
     if (recapIds && Array.isArray(recapIds) && recapIds.length > 0) {
+      console.log(`📊 [BULK DELETE] Traitement de ${recapIds.length} employé(s) importé(s)...`);
+      console.log(`  📝 Matricules à supprimer:`, recapIds);
+      
       const result = await MonthlyRecap.deleteMany({ matricule: { $in: recapIds } });
       recapDeleted = result.deletedCount || 0;
       totalDeleted += recapDeleted;
+      console.log(`  ✅ Supprimés (importés): ${recapDeleted} sur ${recapIds.length}`);
+      
+      if (recapDeleted < recapIds.length) {
+        const found = await MonthlyRecap.find({ matricule: { $in: recapIds } });
+        const foundMatricules = found.map(f => f.matricule);
+        const missing = recapIds.filter(id => !foundMatricules.includes(id));
+        console.log(`  ⚠️ Non trouvés (importés):`, missing);
+      }
     }
     
+    console.log(`📊 [BULK DELETE] Résultat final: ${totalDeleted} supprimé(s) au total`);
+    
     if (totalDeleted === 0) {
-      return res.status(404).json({ message: 'Aucun employé trouvé à supprimer' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Aucun employé trouvé à supprimer',
+        notFoundIds 
+      });
     }
     
     res.json({
+      success: true,
       message: `${totalDeleted} employé(s) supprimé(s) avec leurs données associées`,
       details: {
         totalDeleted,
-        regularDeleted: ids?.length || 0,
+        regularDeleted: deletedIds.length,
         recapDeleted,
+        notFoundIds,
         absencesSupprimees: absencesDeleted,
         workloadsSupprimees: workloadsDeleted,
         turnoverSupprimees: turnoverDeleted,
@@ -139,7 +222,7 @@ exports.deleteMultipleEmployees = async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Erreur suppression bulk:', error);
+    console.error('❌ [BULK DELETE] Erreur:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -6,9 +6,9 @@ import {
 import Navbar from './Navbar';
 import '../style/AIPrediction.css';
 
-type RiskType = 'Departure' | 'Absenteeism' | 'Overload';
-type RiskLevel = 'Low' | 'Medium' | 'High';
-type SuggestedAction = 'Mitigate' | 'Support' | 'Train' | 'Monitor';
+type RiskType = 'Départ' | 'Absentéisme' | 'Surcharge';
+type RiskLevel = 'Faible' | 'Moyen' | 'Élevé';
+type SuggestedAction = 'Atténuer' | 'Accompagner' | 'Former' | 'Surveiller';
 
 interface EmployeeRisk {
   id: string;
@@ -33,8 +33,8 @@ const API_BASE_URL = 'http://localhost:5000/api';
 
 const AIPrediction: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState('All departments');
-  const [riskTypeFilter, setRiskTypeFilter] = useState('All types');
+  const [departmentFilter, setDepartmentFilter] = useState('Tous les départements');
+  const [riskTypeFilter, setRiskTypeFilter] = useState('Tous les types');
   const [employees, setEmployees] = useState<EmployeeRisk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,25 +98,25 @@ const AIPrediction: React.FC = () => {
           totalOverloadRisk += overloadScore;
           
           const risks = [
-            { type: 'Departure' as RiskType, score: departureScore },
-            { type: 'Absenteeism' as RiskType, score: absenceScore },
-            { type: 'Overload' as RiskType, score: overloadScore }
+            { type: 'Départ' as RiskType, score: departureScore },
+            { type: 'Absentéisme' as RiskType, score: absenceScore },
+            { type: 'Surcharge' as RiskType, score: overloadScore }
           ];
           const highestRisk = risks.reduce((max, r) => r.score > max.score ? r : max, risks[0]);
           
-          let riskLevel: RiskLevel = 'Low';
-          if (highestRisk.score >= 70) riskLevel = 'High';
-          else if (highestRisk.score >= 40) riskLevel = 'Medium';
+          let riskLevel: RiskLevel = 'Faible';
+          if (highestRisk.score >= 70) riskLevel = 'Élevé';
+          else if (highestRisk.score >= 40) riskLevel = 'Moyen';
           
-          let suggestedAction: SuggestedAction = 'Monitor';
-          if (highestRisk.score >= 75) suggestedAction = 'Mitigate';
-          else if (highestRisk.score >= 60) suggestedAction = 'Support';
-          else if (highestRisk.score >= 40) suggestedAction = 'Train';
+          let suggestedAction: SuggestedAction = 'Surveiller';
+          if (highestRisk.score >= 75) suggestedAction = 'Atténuer';
+          else if (highestRisk.score >= 60) suggestedAction = 'Accompagner';
+          else if (highestRisk.score >= 40) suggestedAction = 'Former';
           
           employeeRisks.push({
             id: item.employeeId,
             name: item.employeeName,
-            department: item.department || 'Unknown',
+            department: item.department || 'Inconnu',
             riskType: highestRisk.type,
             riskLevel: riskLevel,
             suggestedAction: suggestedAction,
@@ -175,20 +175,20 @@ const AIPrediction: React.FC = () => {
       
       setRecommendations([
         highRiskCount > 0 
-          ? `🔴 ${highRiskCount} employee(s) at high departure risk. Schedule retention meetings.`
-          : '✅ No high departure risk detected.',
+          ? `🔴 ${highRiskCount} employé(s) à risque de départ élevé. Planifiez des entretiens de rétention.`
+          : '✅ Aucun risque de départ élevé détecté.',
         avgOverload > 50 
-          ? `⚠️ Critical overload risk detected (${avgOverload}%, ${criticalWorkload} critical cases). Review workload distribution.`
-          : `⚠️ Moderate overload risk detected (${avgOverload}%, ${criticalWorkload} critical cases).`,
+          ? `⚠️ Risque de surcharge critique détecté (${avgOverload}%, ${criticalWorkload} cas critiques). Revoyez la répartition de la charge de travail.`
+          : `⚠️ Risque de surcharge modéré détecté (${avgOverload}%, ${criticalWorkload} cas critiques).`,
         avgAbsenteeism > 30 
-          ? `📊 High absenteeism risk (${avgAbsenteeism}%). Schedule wellness checks.`
-          : `📊 Absenteeism risk at ${avgAbsenteeism}%. Continue monitoring.`,
-        `🤖 AI recommends ${employeeRisks.filter(e => e.suggestedAction === 'Mitigate').length} immediate interventions.`
+          ? `📊 Risque d'absentéisme élevé (${avgAbsenteeism}%). Planifiez des bilans de bien-être.`
+          : `📊 Risque d'absentéisme à ${avgAbsenteeism}%. Surveillance continue recommandée.`,
+        `🤖 L'IA recommande ${employeeRisks.filter(e => e.suggestedAction === 'Atténuer').length} intervention(s) immédiate(s).`
       ]);
       
     } catch (err) {
       console.error('Error fetching predictions:', err);
-      setError('Failed to load AI predictions. Please check if backend is running.');
+      setError('Échec du chargement des prédictions IA. Vérifiez que le backend est en cours d\'exécution.');
     } finally {
       setLoading(false);
     }
@@ -196,9 +196,9 @@ const AIPrediction: React.FC = () => {
 
   const getRiskLevelColor = (level: RiskLevel): string => {
     switch (level) {
-      case 'Low': return '#10b981';
-      case 'Medium': return '#f59e0b';
-      case 'High': return '#ef4444';
+      case 'Faible': return '#10b981';
+      case 'Moyen': return '#f59e0b';
+      case 'Élevé': return '#ef4444';
       default: return '#6b7280';
     }
   };
@@ -211,14 +211,14 @@ const AIPrediction: React.FC = () => {
 
   const highRiskThreshold = 70;
   const criticalAlerts = employees.filter(e => e.riskScore > highRiskThreshold).length;
-  const departments = ['All departments', ...new Set(employees.map(e => e.department))];
-  const riskTypes = ['All types', 'Departure', 'Absenteeism', 'Overload'];
+  const departments = ['Tous les départements', ...new Set(employees.map(e => e.department))];
+  const riskTypes = ['Tous les types', 'Départ', 'Absentéisme', 'Surcharge'];
 
   const filteredEmployees = employees.filter(emp => {
     const matchSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         emp.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchDept = departmentFilter === 'All departments' || emp.department === departmentFilter;
-    const matchType = riskTypeFilter === 'All types' || emp.riskType === riskTypeFilter;
+    const matchDept = departmentFilter === 'Tous les départements' || emp.department === departmentFilter;
+    const matchType = riskTypeFilter === 'Tous les types' || emp.riskType === riskTypeFilter;
     return matchSearch && matchDept && matchType;
   });
 
@@ -229,7 +229,7 @@ const AIPrediction: React.FC = () => {
         <div className="ai-prediction-page">
           <div className="loading-container">
             <div className="spinner"></div>
-            <p>Loading AI predictions from backend...</p>
+            <p>Chargement des prédictions IA depuis le backend...</p>
           </div>
         </div>
       </div>
@@ -243,7 +243,7 @@ const AIPrediction: React.FC = () => {
         <div className="ai-prediction-page">
           <div className="error-container">
             <p>❌ {error}</p>
-            <button onClick={fetchBatchPredictions}>Retry</button>
+            <button onClick={fetchBatchPredictions}>Réessayer</button>
           </div>
         </div>
       </div>
@@ -255,42 +255,42 @@ const AIPrediction: React.FC = () => {
       <Navbar />
       <div className="ai-prediction-page">
         <div className="page-header">
-          <h1>AI Prediction</h1>
-          <p>Forecast HR risks and receive proactive insights based on real data.</p>
+          <h1>Prédictions IA</h1>
+          <p>Prévision des risques RH et recommandations proactives basées sur les données réelles.</p>
         </div>
 
         <div className="prediction-cards">
           <div className="prediction-card">
             <div className="card-icon">🚪</div>
             <div className="card-content">
-              <div className="card-title">DEPARTURE RISK</div>
+              <div className="card-title">RISQUE DE DÉPART</div>
               <div className="card-value">{globalRisks.departure}%</div>
-              <div className="card-trend">Based on workload & overtime analysis</div>
+              <div className="card-trend">Basé sur l'analyse de la charge de travail et des heures supplémentaires</div>
             </div>
           </div>
           <div className="prediction-card">
             <div className="card-icon">📅</div>
             <div className="card-content">
-              <div className="card-title">ABSENTEEISM RISK</div>
+              <div className="card-title">RISQUE D'ABSENTÉISME</div>
               <div className="card-value">{globalRisks.absenteeism}%</div>
-              <div className="card-trend">Based on last 3 months absence history</div>
+              <div className="card-trend">Basé sur l'historique des absences des 3 derniers mois</div>
             </div>
           </div>
           <div className="prediction-card">
             <div className="card-icon">⚡</div>
             <div className="card-content">
-              <div className="card-title">WORK OVERLOAD RISK</div>
+              <div className="card-title">RISQUE DE SURCHARGE</div>
               <div className="card-value">{globalRisks.overload}%</div>
-              <div className="card-trend">Based on weekly hours & overtime</div>
+              <div className="card-trend">Basé sur les heures hebdomadaires et les heures supplémentaires</div>
             </div>
           </div>
         </div>
 
         <div className="ai-alerts">
           <div className="alert-header">
-            <h3>🤖 AI Alerts & Recommendations</h3>
+            <h3>🤖 Alertes IA & Recommandations</h3>
           </div>
-          <div className="alert-badge">{criticalAlerts} employee(s) exceed high-risk threshold</div>
+          <div className="alert-badge">{criticalAlerts} employé(s) dépassent le seuil de risque élevé</div>
           <ul className="recommendations">
             {recommendations.map((rec, idx) => <li key={idx}>{rec}</li>)}
           </ul>
@@ -298,9 +298,9 @@ const AIPrediction: React.FC = () => {
 
         <div className="table-section">
           <div className="table-header">
-            <h2>Employee Risk Assessment</h2>
+            <h2>Évaluation des risques par employé</h2>
             <div className="filters">
-              <input type="text" placeholder="Search by name or dept" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="Rechercher par nom ou département" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
                 {departments.map(d => <option key={d}>{d}</option>)}
               </select>
@@ -313,12 +313,12 @@ const AIPrediction: React.FC = () => {
             <table className="risk-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>Departure Risk</th>
-                  <th>Absenteeism Risk</th>
-                  <th>Overload Risk</th>
-                  <th>Primary Risk</th>
+                  <th>Employé</th>
+                  <th>Département</th>
+                  <th>Risque Départ</th>
+                  <th>Risque Absentéisme</th>
+                  <th>Risque Surcharge</th>
+                  <th>Risque Principal</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -341,21 +341,21 @@ const AIPrediction: React.FC = () => {
 
         <div className="charts-row">
           <div className="chart-card">
-            <h3>Risk by Department</h3>
+            <h3>Risque par département</h3>
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={departmentRisks.length > 0 ? departmentRisks : [{ department: 'No Data', riskScore: 0 }]}>
+              <BarChart data={departmentRisks.length > 0 ? departmentRisks : [{ department: 'Aucune donnée', riskScore: 0 }]}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="department" />
                 <YAxis tickFormatter={(v) => `${v}%`} />
                 <Tooltip formatter={(value) => `${value}%`} />
                 <Legend />
-                <Bar dataKey="riskScore" fill="#10b981" name="Risk Score (%)" />
+                <Bar dataKey="riskScore" fill="#10b981" name="Score de risque (%)" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           <div className="chart-card">
-            <h3>Turnover Risk Trend (6 months)</h3>
+            <h3>Tendance du risque de turnover (6 mois)</h3>
             <ResponsiveContainer width="100%" height={350}>
               <LineChart data={turnoverTrend}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -363,7 +363,7 @@ const AIPrediction: React.FC = () => {
                 <YAxis tickFormatter={(v) => `${v}%`} domain={[0, 8]} />
                 <Tooltip formatter={(value) => `${value}%`} />
                 <Legend />
-                <Line type="monotone" dataKey="risk" stroke="#f97316" name="Turnover Risk (%)" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="risk" stroke="#f97316" name="Risque de turnover (%)" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

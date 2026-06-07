@@ -22,6 +22,23 @@ interface EmployeeData {
   fromRecap?: boolean;
 }
 
+// Toast component for notifications
+const Toast: React.FC<{ message: string; type?: 'success' | 'error'; onClose: () => void }> = ({ message, type = 'success', onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={`custom-toast ${type === 'error' ? 'toast-error' : ''}`}>
+      <span className="toast-icon">{type === 'success' ? '✅' : '❌'}</span>
+      <span className="toast-message">{message}</span>
+    </div>
+  );
+};
+
 const Employee: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +50,9 @@ const Employee: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<EmployeeData | null>(null);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
 
   const [newEmployee, setNewEmployee] = useState({
     prenom: '',
@@ -68,11 +87,6 @@ const Employee: React.FC = () => {
     htHours: 0,
     nightHours: 0,
   });
-
-  // Force refresh function
-  const forceRefresh = () => {
-    setRefreshKey(prev => prev + 1);
-  };
 
   // Gestionnaires d'événements pour le formulaire d'ajout
   const handleNewPrenomChange = (value: string) => {
@@ -200,12 +214,18 @@ const Employee: React.FC = () => {
         fetch('/api/employees'),
         fetch('/api/monthly-recap')
       ]);
+      
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
       const data = await response.json();
       const recapData = recapResponse.ok ? await recapResponse.json() : [];
       
+      console.log('📊 [FETCH] Employés normaux reçus:', data.length);
+      console.log('📊 [FETCH] Employés importés reçus:', recapData.length);
+      
+      // Formater les employés normaux (ajoutés manuellement)
       const formatted: EmployeeData[] = (data || []).map((emp: any) => ({
-        id: emp.employee_id || '',
+        id: emp.employee_id || emp._id || '',
         matricule: emp.matricule || '',
         name: `${emp.prenom || ''} ${emp.nom || ''}`.trim(),
         department: emp.departement || '',
@@ -222,8 +242,9 @@ const Employee: React.FC = () => {
         fromRecap: false,
       }));
       
+      // Formater les employés importés (depuis Excel)
       const recapEmployees: EmployeeData[] = (recapData || []).map((item: any) => ({
-        id: item.matricule || '',
+        id: item.matricule || item._id || '',
         matricule: item.matricule || '',
         name: item.employeeName || '',
         department: item.department || '',
@@ -240,8 +261,24 @@ const Employee: React.FC = () => {
         fromRecap: true,
       }));
 
-      setEmployees(recapEmployees.length ? recapEmployees : formatted);
+      // Fusionner les deux listes avec un Map pour éviter les doublons
+      const employeeMap = new Map();
+      
+      formatted.forEach(emp => {
+        employeeMap.set(emp.id, emp);
+      });
+      
+      recapEmployees.forEach(emp => {
+        if (!employeeMap.has(emp.id)) {
+          employeeMap.set(emp.id, emp);
+        }
+      });
+      
+      const allEmployees = Array.from(employeeMap.values());
+      console.log('📊 [FETCH] Total après fusion:', allEmployees.length);
+      setEmployees(allEmployees);
       setError('');
+      
     } catch (err) {
       console.error(err);
       setError("Impossible de charger les employés");
@@ -254,6 +291,7 @@ const Employee: React.FC = () => {
   useEffect(() => {
     fetchEmployees();
     const refresh = () => {
+      console.log('🔄 [EVENT] Refresh déclenché');
       fetchEmployees();
     };
     window.addEventListener('monthly-recap-imported', refresh);
@@ -266,16 +304,16 @@ const Employee: React.FC = () => {
       window.removeEventListener('employee-added', refresh);
       window.removeEventListener('employee-deleted', refresh);
     };
-  }, [refreshKey]);
+  }, []);
 
   // ========== ADD EMPLOYEE ==========
   const handleAddEmployee = async () => {
-    if (!newEmployee.prenom.trim()) { alert("Le prénom est requis"); return; }
-    if (!newEmployee.nom.trim()) { alert("Le nom est requis"); return; }
-    if (!newEmployee.id.trim()) { alert("L'ID employé est requis"); return; }
-    if (!newEmployee.department.trim()) { alert("Le département est requis"); return; }
-    if (!newEmployee.position.trim()) { alert("Le poste est requis"); return; }
-    if (newEmployee.age < 16) { alert("L'âge doit être au moins 16 ans"); return; }
+    if (!newEmployee.prenom.trim()) { setToastMessage("Le prénom est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    if (!newEmployee.nom.trim()) { setToastMessage("Le nom est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    if (!newEmployee.id.trim()) { setToastMessage("L'ID employé est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    if (!newEmployee.department.trim()) { setToastMessage("Le département est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    if (!newEmployee.position.trim()) { setToastMessage("Le poste est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    if (newEmployee.age < 16) { setToastMessage("L'âge doit être au moins 16 ans"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
 
     const email = `${newEmployee.prenom.toLowerCase()}.${newEmployee.nom.toLowerCase()}.${newEmployee.id.toLowerCase()}@rh.com`.replace(/[^a-z0-9.@]/g, '');
 
@@ -306,10 +344,10 @@ const Employee: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Erreur serveur');
       
-      // Rafraîchir la liste immédiatement
-      await fetchEmployees();
+      setToastMessage(` Employé ${newEmployee.prenom} ${newEmployee.nom} ajouté avec succès !`);
+      setToastType('success');
       
-      // Déclencher un événement pour les autres composants
+      await fetchEmployees();
       window.dispatchEvent(new Event('employee-added'));
       
       setShowAddModal(false);
@@ -318,8 +356,12 @@ const Employee: React.FC = () => {
         age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, nightHours: 0,
       });
       
+      setTimeout(() => setToastMessage(null), 3000);
+      
     } catch (err: any) {
-      alert(`Erreur lors de l'ajout: ${err.message}`);
+      setToastMessage(`❌ Erreur lors de l'ajout: ${err.message}`);
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
     }
   };
 
@@ -378,30 +420,56 @@ const Employee: React.FC = () => {
         const errData = await res.json();
         throw new Error(errData.message);
       }
+      
+      // ✅ Message de succès
+      setToastMessage(` Employé ${editForm.prenom} ${editForm.nom} modifié avec succès !`);
+      setToastType('success');
+      
       await fetchEmployees();
       window.dispatchEvent(new Event('employee-added'));
       setShowEditModal(false);
       setEditingEmployee(null);
+      
+      setTimeout(() => setToastMessage(null), 3000);
+      
     } catch (err: any) {
-      alert(`Erreur modification: ${err.message}`);
+      setToastMessage(`❌ Erreur modification: ${err.message}`);
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
     }
   };
 
-  // ========== DELETE EMPLOYEE (individual) ==========
+  // ========== DELETE SINGLE EMPLOYEE ==========
   const handleDeleteEmployee = async (id: string, fromRecap: boolean = false) => {
     if (!window.confirm('Supprimer cet employé ?')) return;
+    
+    const deletedEmployee = employees.find(emp => emp.id === id);
+    setEmployees(prev => prev.filter(emp => emp.id !== id));
+    
     try {
       const endpoint = fromRecap ? `/api/monthly-recap/${id}` : `/api/employees/${id}`;
       const res = await fetch(endpoint, { method: 'DELETE' });
       if (!res.ok) throw new Error();
-      await fetchEmployees();
+      
+      setToastMessage(`✅ Employé supprimé avec succès !`);
+      setToastType('success');
+      
       window.dispatchEvent(new Event('employee-deleted'));
+      await fetchEmployees();
+      
+      setTimeout(() => setToastMessage(null), 3000);
+      
     } catch (err) {
-      alert('Erreur lors de la suppression');
+      if (deletedEmployee) {
+        setEmployees(prev => [deletedEmployee, ...prev]);
+      }
+      setToastMessage(`❌ Erreur lors de la suppression`);
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
     }
   };
 
-  // ========== DELETE WITH SELECTION (BULK) ==========
+  // ========== DELETE BULK ==========
   const toggleSelectEmployee = (id: string, isImported: boolean) => {
     const key = `${isImported ? 'recap' : 'emp'}:${id}`;
     const newSelected = new Set(selectedForDelete);
@@ -414,20 +482,26 @@ const Employee: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedForDelete.size === filteredEmployees.length) {
+    if (selectedForDelete.size === filteredEmployees.length && filteredEmployees.length > 0) {
       setSelectedForDelete(new Set());
     } else {
-      const allIds = new Set(filteredEmployees.map(e => `${e.fromRecap ? 'recap' : 'emp'}:${e.id}`));
+      const allIds = new Set(
+        filteredEmployees.map(e => `${e.fromRecap ? 'recap' : 'emp'}:${e.id}`)
+      );
       setSelectedForDelete(allIds);
     }
   };
 
   const handleBulkDelete = async () => {
     if (selectedForDelete.size === 0) {
-      alert('Sélectionnez au moins un employé');
+      setToastMessage("Sélectionnez au moins un employé");
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
       return;
     }
-    if (!window.confirm(`Supprimer ${selectedForDelete.size} employé(s) ?`)) return;
+    if (!window.confirm(`Supprimer ${selectedForDelete.size} employé(s) ? Cette action est irréversible.`)) return;
+
+    setIsDeleting(true);
 
     const selectedArray = Array.from(selectedForDelete);
     const regularIds = selectedArray
@@ -437,6 +511,14 @@ const Employee: React.FC = () => {
       .filter(id => id.startsWith('recap:'))
       .map(id => id.replace('recap:', ''));
 
+    const allIdsToRemove = [...regularIds, ...importedIds];
+
+    const deletedEmployeesBackup = employees.filter(emp => allIdsToRemove.includes(emp.id));
+
+    setEmployees(prev => prev.filter(emp => !allIdsToRemove.includes(emp.id)));
+    setSelectedForDelete(new Set());
+    setShowDeleteConfirm(false);
+
     try {
       const response = await fetch('/api/employees/bulk/delete', {
         method: 'POST',
@@ -444,21 +526,28 @@ const Employee: React.FC = () => {
         body: JSON.stringify({ ids: regularIds, recapIds: importedIds }),
       });
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erreur lors de la suppression');
+        throw new Error(result.message || 'Erreur lors de la suppression');
       }
       
-      const result = await response.json();
-      alert(result.message);
+      setToastMessage(`✅ ${result.message}`);
+      setToastType('success');
       
-      setSelectedForDelete(new Set());
-      setShowDeleteConfirm(false);
-      await fetchEmployees();
       window.dispatchEvent(new Event('employee-deleted'));
+      await fetchEmployees();
+      
+      setTimeout(() => setToastMessage(null), 3000);
       
     } catch (err: any) {
-      alert(err.message || 'Erreur lors de la suppression');
+      console.error('❌ [BULK] Erreur:', err);
+      setToastMessage(`❌ ${err.message || 'Erreur lors de la suppression'}`);
+      setToastType('error');
+      setEmployees(prev => [...deletedEmployeesBackup, ...prev]);
+      setTimeout(() => setToastMessage(null), 3000);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -477,10 +566,18 @@ const Employee: React.FC = () => {
       if (!res.ok) throw new Error(data.message);
       localStorage.setItem('monthlyRecapLastImport', String(Date.now()));
       window.dispatchEvent(new Event('monthly-recap-imported'));
-      alert(data.message);
+      
+      setToastMessage(`✅ ${data.message}`);
+      setToastType('success');
+      
       await fetchEmployees();
+      
+      setTimeout(() => setToastMessage(null), 3000);
+      
     } catch (err: any) {
-      alert(`Erreur import: ${err.message}`);
+      setToastMessage(`❌ Erreur import: ${err.message}`);
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
     }
     event.target.value = '';
   };
@@ -491,7 +588,7 @@ const Employee: React.FC = () => {
   const totalHoraire = employees.filter(e => e.regime?.toLowerCase() === 'horaire').length;
   const totalJournalier = employees.filter(e => e.regime?.toLowerCase() === 'journalier').length;
 
-  // ========== SAFE FILTER ==========
+  // ========== FILTER ==========
   const filteredEmployees = employees.filter(emp => {
     if (!emp) return false;
     const searchLower = (searchTerm || '').toLowerCase();
@@ -509,6 +606,12 @@ const Employee: React.FC = () => {
   return (
     <div>
       <Navbar />
+      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast message={toastMessage} type={toastType} onClose={() => setToastMessage(null)} />
+      )}
+      
       <div className="employee-page">
         <div className="page-header">
           <h1>Employés</h1>
@@ -532,16 +635,19 @@ const Employee: React.FC = () => {
           />
           <div className="filters">
             <select className="status-filter" value={statusFilter} onChange={(e) => handleStatusFilterChange(e.target.value)}>
-              <option>Tous les statuts</option><option>Actif</option><option>En congé</option><option>Absent</option>
+              <option>Tous les statuts</option>
+              <option>Actif</option>
+              <option>En congé</option>
+              <option>Absent</option>
             </select>
             <label className="btn-import">
               📂 Importer Récap
               <input type="file" accept=".xlsx,.xls,.ods" onChange={handleImportExcel} hidden />
             </label>
-            <button className="btn-add" onClick={() => setShowAddModal(true)}>Ajouter</button>
+            <button className="btn-add" onClick={() => setShowAddModal(true)} disabled={isDeleting}>Ajouter</button>
             {selectedForDelete.size > 0 && (
-              <button className="btn-delete-bulk" onClick={() => setShowDeleteConfirm(true)}>
-                Supprimer ({selectedForDelete.size})
+              <button className="btn-delete-bulk" onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting}>
+                {isDeleting ? 'Suppression...' : `Supprimer (${selectedForDelete.size})`}
               </button>
             )}
           </div>
@@ -556,6 +662,7 @@ const Employee: React.FC = () => {
                     type="checkbox" 
                     checked={selectedForDelete.size === filteredEmployees.length && filteredEmployees.length > 0}
                     onChange={toggleSelectAll}
+                    disabled={isDeleting}
                   />
                 </th>
                 <th>Employé</th>
@@ -576,6 +683,7 @@ const Employee: React.FC = () => {
                       type="checkbox" 
                       checked={selectedForDelete.has(`${emp.fromRecap ? 'recap' : 'emp'}:${emp.id}`)}
                       onChange={() => toggleSelectEmployee(emp.id, emp.fromRecap || false)}
+                      disabled={isDeleting}
                     />
                   </td>
                   <td className="employee-info">
@@ -590,7 +698,15 @@ const Employee: React.FC = () => {
                   <td>{emp.joinDate || '-'}</td>
                   <td>{emp.matricule}</td>
                   <td>
-                    <button className="action-btn edit" onClick={() => handleEditClick(emp)}>✏️</button>
+                    {!emp.fromRecap && (
+                      <button 
+                        className="action-btn edit" 
+                        onClick={() => handleEditClick(emp)}
+                        disabled={isDeleting}
+                      >
+                        ✏️
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -610,11 +726,11 @@ const Employee: React.FC = () => {
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Add new employee</h2>
-            <p>Fill in the details to onboard a new team member.</p>
+            <h2>Ajouter un employé</h2>
+            <p>Remplissez les informations pour ajouter un nouveau employé.</p>
             <div className="form-row">
               <div className="form-group">
-                <label>Prénom (First name)</label>
+                <label>Prénom</label>
                 <input 
                   type="text" 
                   placeholder="Prénom" 
@@ -623,7 +739,7 @@ const Employee: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Nom (Last name)</label>
+                <label>Nom</label>
                 <input 
                   type="text" 
                   placeholder="Nom" 
@@ -634,7 +750,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Employee ID</label>
+                <label>ID Employé</label>
                 <input 
                   type="text" 
                   placeholder="ID" 
@@ -654,7 +770,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Job title</label>
+                <label>Poste</label>
                 <input 
                   type="text" 
                   placeholder="Poste" 
@@ -663,7 +779,7 @@ const Employee: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Department</label>
+                <label>Département</label>
                 <input 
                   type="text" 
                   placeholder="Département" 
@@ -674,7 +790,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Status</label>
+                <label>Statut</label>
                 <select 
                   value={newEmployee.status} 
                   onChange={(e) => handleNewStatusChange(e.target.value as EmployeeStatus)}
@@ -685,7 +801,7 @@ const Employee: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label>Age</label>
+                <label>Âge</label>
                 <input 
                   type="number" 
                   value={newEmployee.age} 
@@ -695,7 +811,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Date of joining</label>
+                <label>Date d'embauche</label>
                 <input 
                   type="date" 
                   value={newEmployee.joinDate} 
@@ -739,7 +855,7 @@ const Employee: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label>H. T (hours)</label>
+                <label>Heures (HT)</label>
                 <input 
                   type="number" 
                   placeholder="0" 
@@ -750,7 +866,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Night Hours (H. NUIT)</label>
+                <label>Heures de Nuit</label>
                 <input 
                   type="number" 
                   placeholder="0" 
@@ -760,8 +876,8 @@ const Employee: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleAddEmployee}>Add employee</button>
+              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Annuler</button>
+              <button className="btn-submit" onClick={handleAddEmployee}>Ajouter</button>
             </div>
           </div>
         </div>
@@ -771,11 +887,11 @@ const Employee: React.FC = () => {
       {showEditModal && editingEmployee && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Edit employee</h2>
-            <p>Modify the details of {editingEmployee.name}.</p>
+            <h2>Modifier l'employé</h2>
+            <p>Modifiez les informations de {editingEmployee.name}.</p>
             <div className="form-row">
               <div className="form-group">
-                <label>Prénom (First name)</label>
+                <label>Prénom</label>
                 <input 
                   type="text" 
                   value={editForm.prenom} 
@@ -783,7 +899,7 @@ const Employee: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Nom (Last name)</label>
+                <label>Nom</label>
                 <input 
                   type="text" 
                   value={editForm.nom} 
@@ -793,7 +909,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Employee ID</label>
+                <label>ID Employé</label>
                 <input value={editForm.id} disabled />
               </div>
               <div className="form-group">
@@ -807,7 +923,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Job title</label>
+                <label>Poste</label>
                 <input 
                   type="text" 
                   value={editForm.position} 
@@ -815,7 +931,7 @@ const Employee: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Department</label>
+                <label>Département</label>
                 <input 
                   type="text" 
                   value={editForm.department} 
@@ -825,7 +941,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Status</label>
+                <label>Statut</label>
                 <select 
                   value={editForm.status} 
                   onChange={(e) => handleEditStatusChange(e.target.value as EmployeeStatus)}
@@ -836,7 +952,7 @@ const Employee: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label>Age</label>
+                <label>Âge</label>
                 <input 
                   type="number" 
                   value={editForm.age} 
@@ -846,7 +962,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Date of joining</label>
+                <label>Date d'embauche</label>
                 <input 
                   type="date" 
                   value={editForm.joinDate} 
@@ -890,7 +1006,7 @@ const Employee: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label>H. T (hours)</label>
+                <label>Heures (HT)</label>
                 <input 
                   type="number" 
                   placeholder="0" 
@@ -901,7 +1017,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Night Hours (H. NUIT)</label>
+                <label>Heures de Nuit</label>
                 <input 
                   type="number" 
                   placeholder="0" 
@@ -911,8 +1027,8 @@ const Employee: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleSaveEdit}>Save changes</button>
+              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Annuler</button>
+              <button className="btn-submit" onClick={handleSaveEdit}>Enregistrer</button>
             </div>
           </div>
         </div>
@@ -925,8 +1041,10 @@ const Employee: React.FC = () => {
             <h2>Confirmer la suppression</h2>
             <p>Êtes-vous sûr de vouloir supprimer {selectedForDelete.size} employé(s) ? Cette action ne peut pas être annulée.</p>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
-              <button className="btn-delete" onClick={handleBulkDelete}>Supprimer</button>
+              <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>Annuler</button>
+              <button className="btn-delete" onClick={handleBulkDelete} disabled={isDeleting}>
+                {isDeleting ? 'Suppression...' : 'Supprimer'}
+              </button>
             </div>
           </div>
         </div>

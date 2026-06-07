@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
@@ -23,6 +23,33 @@ interface EmployeeWorkload {
   fromRecap?: boolean;
 }
 
+interface Employee {
+  id: string;
+  employee_id: string;
+  matricule: string;
+  nom: string;
+  prenom: string;
+  departement: string;
+  poste: string;
+}
+
+// Toast component for notifications
+const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="custom-toast">
+      <span className="toast-icon">✅</span>
+      <span className="toast-message">{message}</span>
+    </div>
+  );
+};
+
 const WorkloadManagement: React.FC = () => {
   const [workloads, setWorkloads] = useState<EmployeeWorkload[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,22 +59,129 @@ const WorkloadManagement: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingWorkload, setEditingWorkload] = useState<EmployeeWorkload | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  
+  // Toast state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
+  // Searchable select states (like in AbsenceManagement)
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [newWorkload, setNewWorkload] = useState({
     employeeId: '',
     name: '',
     department: '',
-    weeklyHours: 40,
+    weeklyHours: 0,
     overtimeHours: 0,
+    overtime25: 0,
+    overtime50: 0,
+    overtime100: 0,
+    nightHours: 0,
     status: 'Normal' as WorkloadStatus
   });
+
   const [editForm, setEditForm] = useState({
     employeeId: '',
     name: '',
     department: '',
-    weeklyHours: 40,
+    weeklyHours: 0,
     overtimeHours: 0,
+    overtime25: 0,
+    overtime50: 0,
+    overtime100: 0,
+    nightHours: 0,
     status: 'Normal' as WorkloadStatus
   });
+
+  // Load stored message after refresh
+  useEffect(() => {
+    const storedMessage = sessionStorage.getItem('successMessage');
+    if (storedMessage) {
+      setToastMessage(storedMessage);
+      sessionStorage.removeItem('successMessage');
+    }
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(emp => {
+    const searchLower = employeeSearchTerm.toLowerCase();
+    return emp.nom?.toLowerCase().includes(searchLower) || 
+           emp.prenom?.toLowerCase().includes(searchLower) ||
+           emp.matricule?.toLowerCase().includes(searchLower) ||
+           emp.employee_id?.toLowerCase().includes(searchLower) ||
+           `${emp.nom} ${emp.prenom}`.toLowerCase().includes(searchLower);
+  });
+
+  // Charger les employés
+  const fetchEmployees = async () => {
+    try {
+      const response = await fetch('/api/employees');
+      if (response.ok) {
+        const data = await response.json();
+        let employeeArray = [];
+        if (Array.isArray(data)) {
+          employeeArray = data;
+        } else if (data.employees && Array.isArray(data.employees)) {
+          employeeArray = data.employees;
+        } else {
+          employeeArray = [];
+        }
+        
+        const employeeList: Employee[] = employeeArray.map((emp: any) => ({
+          id: emp.employee_id || emp.matricule || emp.id,
+          employee_id: emp.employee_id || emp.matricule || emp.id,
+          matricule: emp.matricule || emp.employee_id || emp.id || '',
+          nom: emp.nom || '',
+          prenom: emp.prenom || '',
+          departement: emp.departement || emp.department || 'Unknown',
+          poste: emp.poste || ''
+        }));
+        
+        setEmployees(employeeList);
+      }
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setNewWorkload({
+      ...newWorkload,
+      employeeId: employee.employee_id || employee.matricule || employee.id,
+      name: `${employee.nom} ${employee.prenom}`.trim(),
+      department: employee.departement,
+    });
+    setEmployeeSearchTerm('');
+    setIsDropdownOpen(false);
+  };
+
+  // Clear selected employee
+  const handleClearEmployee = () => {
+    setSelectedEmployee(null);
+    setNewWorkload({
+      ...newWorkload,
+      employeeId: '',
+      name: '',
+      department: '',
+    });
+    setEmployeeSearchTerm('');
+  };
 
   // ========== FETCH WORKLOADS FROM BACKEND ==========
   const fetchWorkloads = async () => {
@@ -63,14 +197,15 @@ const WorkloadManagement: React.FC = () => {
       
       const formattedWorkloads: EmployeeWorkload[] = (data || []).map((item: any) => ({
         id: item.workload_id || item._id,
+        employeeId: item.employee_id,
         name: item.name || '',
         department: item.department || '',
         weeklyHours: item.weeklyHours || 0,
         overtimeHours: item.overtimeHours || 0,
-        overtime25: 0,
-        overtime50: 0,
-        overtime100: 0,
-        nightHours: 0,
+        overtime25: item.overtime25 || 0,
+        overtime50: item.overtime50 || 0,
+        overtime100: item.overtime100 || 0,
+        nightHours: item.nightHours || 0,
         status: item.status || 'Normal'
       }));
 
@@ -108,14 +243,13 @@ const WorkloadManagement: React.FC = () => {
 
   useEffect(() => {
     fetchWorkloads();
+    fetchEmployees();
     
     const handleEmployeeDeleted = () => {
-      console.log('Employee deleted event received - refreshing workloads');
       fetchWorkloads();
     };
     
     window.addEventListener('employee-deleted', handleEmployeeDeleted);
-    
     const refresh = () => fetchWorkloads();
     window.addEventListener('monthly-recap-imported', refresh);
     window.addEventListener('storage', refresh);
@@ -129,11 +263,8 @@ const WorkloadManagement: React.FC = () => {
 
   // ========== ADD WORKLOAD ==========
   const handleAdd = async () => {
-    if (!newWorkload.employeeId.trim()) { alert("L'ID employé est requis"); return; }
-    if (!newWorkload.name.trim()) { alert("Le nom est requis"); return; }
-    if (!newWorkload.department.trim()) { alert("Le département est requis"); return; }
-    if (newWorkload.weeklyHours < 0) { alert("Les heures hebdomadaires doivent être >= 0"); return; }
-    if (newWorkload.overtimeHours < 0) { alert("Les heures supplémentaires doivent être >= 0"); return; }
+    if (!newWorkload.employeeId.trim()) { setToastMessage("⚠️ Veuillez sélectionner un employé"); return; }
+    if (newWorkload.weeklyHours < 0) { setToastMessage("⚠️ Les heures hebdomadaires doivent être >= 0"); return; }
 
     const payload = {
       workload_id: `WL${Date.now()}`,
@@ -142,6 +273,10 @@ const WorkloadManagement: React.FC = () => {
       department: newWorkload.department,
       weeklyHours: newWorkload.weeklyHours,
       overtimeHours: newWorkload.overtimeHours,
+      overtime25: newWorkload.overtime25,
+      overtime50: newWorkload.overtime50,
+      overtime100: newWorkload.overtime100,
+      nightHours: newWorkload.nightHours,
       status: newWorkload.status
     };
 
@@ -157,18 +292,28 @@ const WorkloadManagement: React.FC = () => {
         throw new Error(data.message || 'Erreur ajout');
       }
       
-      await fetchWorkloads();
+      const successMsg = `Charge de travail ajoutée avec succès pour ${newWorkload.name}`;
+      sessionStorage.setItem('successMessage', successMsg);
+      
       setShowAddModal(false);
+      setSelectedEmployee(null);
       setNewWorkload({
         employeeId: '',
         name: '',
         department: '',
-        weeklyHours: 40,
+        weeklyHours: 0,
         overtimeHours: 0,
+        overtime25: 0,
+        overtime50: 0,
+        overtime100: 0,
+        nightHours: 0,
         status: 'Normal'
       });
+      
+      window.location.reload();
+      
     } catch (err: any) {
-      alert(`Erreur lors de l'ajout: ${err.message}`);
+      setToastMessage(`❌ Erreur lors de l'ajout: ${err.message}`);
     }
   };
 
@@ -176,11 +321,15 @@ const WorkloadManagement: React.FC = () => {
   const handleEditClick = (workload: EmployeeWorkload) => {
     setEditingWorkload(workload);
     setEditForm({
-      employeeId: '',
+      employeeId: workload.employeeId || '',
       name: workload.name,
       department: workload.department,
       weeklyHours: workload.weeklyHours,
       overtimeHours: workload.overtimeHours,
+      overtime25: workload.overtime25 || 0,
+      overtime50: workload.overtime50 || 0,
+      overtime100: workload.overtime100 || 0,
+      nightHours: workload.nightHours || 0,
       status: workload.status,
     });
     setShowEditModal(true);
@@ -194,6 +343,10 @@ const WorkloadManagement: React.FC = () => {
       department: editForm.department,
       weeklyHours: editForm.weeklyHours,
       overtimeHours: editForm.overtimeHours,
+      overtime25: editForm.overtime25,
+      overtime50: editForm.overtime50,
+      overtime100: editForm.overtime100,
+      nightHours: editForm.nightHours,
       status: editForm.status,
     };
 
@@ -204,34 +357,30 @@ const WorkloadManagement: React.FC = () => {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Erreur modification');
-      await fetchWorkloads();
+      
+      sessionStorage.setItem('successMessage', `Charge de travail modifiée avec succès pour ${editForm.name}`);
+      
       setShowEditModal(false);
       setEditingWorkload(null);
+      
+      window.location.reload();
+      
     } catch (err) {
-      alert('Erreur lors de la modification');
+      setToastMessage("❌ Erreur lors de la modification");
     }
   };
 
-  // ========== DELETE WORKLOAD ==========
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Supprimer cet enregistrement ?')) return;
-    try {
-      const response = await fetch(`/api/workloads/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Erreur suppression');
-      await fetchWorkloads();
-    } catch (err) {
-      alert('Erreur lors de la suppression');
-    }
-  };
+  
 
   // ========== EXPORT CSV ==========
   const handleExport = () => {
     if (workloads.length === 0) {
-      alert('Aucune donnée à exporter');
+      setToastMessage("Aucune donnée à exporter");
       return;
     }
-    const headers = ['Name', 'Department', 'H. T', '25 %', '50 %', '100 %', 'H. NUIT', 'Total Overtime', 'Status'];
+    const headers = ['ID Employé', 'Name', 'Department', 'H. T', '25 %', '50 %', '100 %', 'H. NUIT', 'Total Overtime', 'Status'];
     const rows = workloads.map(w => [
+      w.employeeId || '',
       w.name || '',
       w.department || '',
       w.weeklyHours || 0,
@@ -250,6 +399,7 @@ const WorkloadManagement: React.FC = () => {
     a.download = 'workload_report.csv';
     a.click();
     URL.revokeObjectURL(url);
+    setToastMessage("Rapport exporté avec succès");
   };
 
   // ========== CALCULATIONS ==========
@@ -298,7 +448,8 @@ const WorkloadManagement: React.FC = () => {
     if (!w) return false;
     const searchLower = (searchTerm || '').toLowerCase();
     const matchSearch = (w.name || '').toLowerCase().includes(searchLower) ||
-                        (w.department || '').toLowerCase().includes(searchLower);
+                        (w.department || '').toLowerCase().includes(searchLower) ||
+                        (w.employeeId || '').toLowerCase().includes(searchLower);
     const matchDept = departmentFilter === 'All departments' || w.department === departmentFilter;
     return matchSearch && matchDept;
   });
@@ -312,6 +463,11 @@ const WorkloadManagement: React.FC = () => {
     }
   };
 
+  // Calcul automatique du total overtime
+  const calculateTotalOvertime = (overtime25: number, overtime50: number, overtime100: number, nightHours: number) => {
+    return (overtime25 || 0) + (overtime50 || 0) + (overtime100 || 0) + (nightHours || 0);
+  };
+
   if (loading) return <div style={{ marginLeft: '260px', padding: '2rem' }}>Chargement des charges de travail...</div>;
   if (error) return <div style={{ color: 'red', marginLeft: '260px', padding: '2rem' }}>{error}</div>;
 
@@ -320,18 +476,23 @@ const WorkloadManagement: React.FC = () => {
       <Navbar />
       <div className="workload-page">
         <div className="page-header">
-          <h1>Workload Management</h1>
-          <p>Monitor employee workload, detect risks of burnout, and balance tasks across teams.</p>
+          <h1>Heure Supplémentaire</h1>
+          <p>Suivre la charge de travail des employés</p>
         </div>
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+        )}
 
         {/* KPI Cards */}
         <div className="kpi-cards">
           <div className="kpi-card">
-            <div className="kpi-title">Avg weekly hours</div>
+            <div className="kpi-title">Avg hours</div>
             <div className="kpi-value">{avgWeeklyHours.toFixed(1)} h</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title">Total overtime</div>
+            <div className="kpi-title">Total HeureSupp</div>
             <div className="kpi-value">{totalOvertime} h</div>
           </div>
           <div className="kpi-card">
@@ -357,7 +518,7 @@ const WorkloadManagement: React.FC = () => {
           <div className="table-header">
             <h2>Workload Overview</h2>
             <div className="filters">
-              <input type="text" placeholder="Search by name or dept" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="Search by name, dept or ID" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}>
                 {departments.map(d => <option key={d}>{d}</option>)}
               </select>
@@ -367,6 +528,7 @@ const WorkloadManagement: React.FC = () => {
             <table className="workload-table">
               <thead>
                 <tr>
+                  <th>ID Employé</th>
                   <th>Name</th>
                   <th>Department</th>
                   <th>H. T</th>
@@ -381,12 +543,13 @@ const WorkloadManagement: React.FC = () => {
               <tbody>
                 {filteredWorkloads.map(work => (
                   <tr key={work.id}>
+                    <td>{work.employeeId || '-'}</td>
                     <td>{work.name}</td>
                     <td>{work.department}</td>
                     <td>{work.weeklyHours}</td>
-                    <td title="Overtime at +25% rate">{work.overtime25 || 0}</td>
-                    <td title="Overtime at +50% rate">{work.overtime50 || 0}</td>
-                    <td title="Overtime at +100% rate">{work.overtime100 || 0}</td>
+                    <td>{work.overtime25 || 0}</td>
+                    <td>{work.overtime50 || 0}</td>
+                    <td>{work.overtime100 || 0}</td>
                     <td>{work.nightHours || 0}</td>
                     <td>{work.overtimeHours}</td>
                     <td>
@@ -398,7 +561,7 @@ const WorkloadManagement: React.FC = () => {
                 ))}
                 {filteredWorkloads.length === 0 && (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem' }}>
                       Aucune charge de travail trouvée.
                     </td>
                   </tr>
@@ -411,7 +574,7 @@ const WorkloadManagement: React.FC = () => {
         {/* Charts */}
         <div className="charts-row">
           <div className="chart-card">
-            <h3>Workload by department (avg weekly hours)</h3>
+            <h3>HeureSUPP par department (avg weekly hours)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={departmentData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -424,7 +587,7 @@ const WorkloadManagement: React.FC = () => {
             </ResponsiveContainer>
           </div>
           <div className="chart-card">
-            <h3>Overtime trends (last 9 months)</h3>
+            <h3>HeureSupp trend (last 9 months)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={overtimeTrends}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -440,7 +603,7 @@ const WorkloadManagement: React.FC = () => {
 
         {/* Heatmap */}
         <div className="heatmap-section">
-          <h3>🔥 Heatmap: Teams with excessive workload</h3>
+          <h3>Équipes avec charge excessive</h3>
           <div className="heatmap-grid">
             {heatmapData.map(item => (
               <div key={item.department} className={`heatmap-cell risk-${item.risk}`}>
@@ -466,72 +629,220 @@ const WorkloadManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Add Modal with Searchable Employee Selector (like AbsenceManagement) */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Add workload record</h2>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Employee ID</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g., EMP001" 
-                  value={newWorkload.employeeId} 
-                  onChange={e => setNewWorkload({...newWorkload, employeeId: e.target.value})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>Name</label>
-                <input 
-                  placeholder="Name" 
-                  value={newWorkload.name} 
-                  onChange={e => setNewWorkload({...newWorkload, name: e.target.value})} 
-                />
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2> Ajouter une charge de travail</h2>
+            
+            {/* Searchable Employee Select - exactly like AbsenceManagement */}
+            <div className="form-group" ref={dropdownRef}>
+              <div className="searchable-select">
+                <div 
+                  className="select-input"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  {selectedEmployee ? (
+                    <div className="selected-employee">
+                      <span className="emp-name">{selectedEmployee.nom} {selectedEmployee.prenom}</span>
+                      <span className="emp-id">Matricule: {selectedEmployee.matricule}</span>
+                      <span className="emp-dept">- {selectedEmployee.departement}</span>
+                      <button 
+                        className="clear-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearEmployee();
+                        }}
+                      >
+                        ✖
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="placeholder">Search by name, matricule, or department...</span>
+                  )}
+                  <span className="dropdown-arrow">▼</span>
+                </div>
+                
+                {isDropdownOpen && (
+                  <div className="dropdown-list">
+                    <input
+                      type="text"
+                      className="dropdown-search"
+                      placeholder="Type name, matricule to search..."
+                      value={employeeSearchTerm}
+                      onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                    <div className="dropdown-items">
+                      {filteredEmployees.length > 0 ? (
+                        filteredEmployees.map(emp => (
+                          <div
+                            key={emp.id}
+                            className="dropdown-item"
+                            onClick={() => handleEmployeeSelect(emp)}
+                          >
+                            <div className="item-name">{emp.nom} {emp.prenom}</div>
+                            <div className="item-details">
+                              <span className="item-id">Matricule: {emp.matricule}</span>
+                              <span className="item-dept">{emp.departement}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="no-results">No employees found</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {selectedEmployee && (
+              <>
+                <div className="info-row">
+                  <span className="info-label">Département:</span>
+                  <span className="info-value">{newWorkload.department || '-'}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">ID Employé:</span>
+                  <span className="info-value">{newWorkload.employeeId || '-'}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Matricule:</span>
+                  <span className="info-value">{selectedEmployee.matricule || '-'}</span>
+                </div>
+              </>
+            )}
+
+            <hr className="separator" />
+
+            {/* Workload Form */}
             <div className="form-row">
               <div className="form-group">
-                <label>Department</label>
-                <input 
-                  placeholder="Department" 
-                  value={newWorkload.department} 
-                  onChange={e => setNewWorkload({...newWorkload, department: e.target.value})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>Weekly hours</label>
+                <label>Heures hebdomadaires (H.T)</label>
                 <input 
                   type="number" 
+                  placeholder="Heures normales"
                   value={newWorkload.weeklyHours} 
                   onChange={e => setNewWorkload({...newWorkload, weeklyHours: Number(e.target.value)})} 
                 />
               </div>
-            </div>
-            <div className="form-row">
               <div className="form-group">
-                <label>Overtime hours</label>
-                <input 
-                  type="number" 
-                  value={newWorkload.overtimeHours} 
-                  onChange={e => setNewWorkload({...newWorkload, overtimeHours: Number(e.target.value)})} 
-                />
-              </div>
-              <div className="form-group">
-                <label>Status</label>
+                <label>Statut</label>
                 <select 
                   value={newWorkload.status} 
                   onChange={e => setNewWorkload({...newWorkload, status: e.target.value as WorkloadStatus})}
                 >
-                  <option>Normal</option>
-                  <option>High</option>
-                  <option>Critical</option>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
                 </select>
               </div>
             </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Heures supplémentaires 25%</label>
+                <input 
+                  type="number" 
+                  placeholder="Heures à 25%"
+                  value={newWorkload.overtime25} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setNewWorkload(prev => ({
+                      ...prev, 
+                      overtime25: val,
+                      overtimeHours: calculateTotalOvertime(val, prev.overtime50, prev.overtime100, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Heures supplémentaires 50%</label>
+                <input 
+                  type="number" 
+                  placeholder="Heures à 50%"
+                  value={newWorkload.overtime50} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setNewWorkload(prev => ({
+                      ...prev, 
+                      overtime50: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, val, prev.overtime100, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Heures supplémentaires 100%</label>
+                <input 
+                  type="number" 
+                  placeholder="Heures à 100%"
+                  value={newWorkload.overtime100} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setNewWorkload(prev => ({
+                      ...prev, 
+                      overtime100: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, prev.overtime50, val, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Heures de nuit</label>
+                <input 
+                  type="number" 
+                  placeholder="Heures de nuit"
+                  value={newWorkload.nightHours} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setNewWorkload(prev => ({
+                      ...prev, 
+                      nightHours: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, prev.overtime50, prev.overtime100, val)
+                    }));
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Total heures supplémentaires</label>
+                <input 
+                  type="number" 
+                  placeholder="Total heures sup"
+                  value={newWorkload.overtimeHours} 
+                  onChange={e => setNewWorkload({...newWorkload, overtimeHours: Number(e.target.value)})} 
+                />
+                <small className="field-hint">Calculé automatiquement à partir des types d'heures</small>
+              </div>
+            </div>
+
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleAdd}>Add</button>
+              <button className="btn-cancel" onClick={() => {
+                setShowAddModal(false);
+                setSelectedEmployee(null);
+                setEmployeeSearchTerm('');
+                setNewWorkload({
+                  employeeId: '',
+                  name: '',
+                  department: '',
+                  weeklyHours: 0,
+                  overtimeHours: 0,
+                  overtime25: 0,
+                  overtime50: 0,
+                  overtime100: 0,
+                  nightHours: 0,
+                  status: 'Normal'
+                });
+              }}>Annuler</button>
+              <button className="btn-submit" onClick={handleAdd}>Ajouter</button>
             </div>
           </div>
         </div>
@@ -541,26 +852,28 @@ const WorkloadManagement: React.FC = () => {
       {showEditModal && editingWorkload && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Edit workload</h2>
+            <h2>✏️ Modifier la charge de travail</h2>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Name</label>
+                <label>Nom complet</label>
                 <input 
                   value={editForm.name} 
                   onChange={e => setEditForm({...editForm, name: e.target.value})} 
                 />
               </div>
               <div className="form-group">
-                <label>Department</label>
+                <label>Département</label>
                 <input 
                   value={editForm.department} 
                   onChange={e => setEditForm({...editForm, department: e.target.value})} 
                 />
               </div>
             </div>
+
             <div className="form-row">
               <div className="form-group">
-                <label>Weekly hours</label>
+                <label>Heures hebdomadaires (H.T)</label>
                 <input 
                   type="number" 
                   value={editForm.weeklyHours} 
@@ -568,30 +881,87 @@ const WorkloadManagement: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Overtime hours</label>
-                <input 
-                  type="number" 
-                  value={editForm.overtimeHours} 
-                  onChange={e => setEditForm({...editForm, overtimeHours: Number(e.target.value)})} 
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Status</label>
+                <label>Statut</label>
                 <select 
                   value={editForm.status} 
                   onChange={e => setEditForm({...editForm, status: e.target.value as WorkloadStatus})}
                 >
-                  <option>Normal</option>
-                  <option>High</option>
-                  <option>Critical</option>
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
                 </select>
               </div>
             </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Heures supplémentaires 25%</label>
+                <input 
+                  type="number" 
+                  value={editForm.overtime25} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setEditForm(prev => ({
+                      ...prev, 
+                      overtime25: val,
+                      overtimeHours: calculateTotalOvertime(val, prev.overtime50, prev.overtime100, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Heures supplémentaires 50%</label>
+                <input 
+                  type="number" 
+                  value={editForm.overtime50} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setEditForm(prev => ({
+                      ...prev, 
+                      overtime50: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, val, prev.overtime100, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Heures supplémentaires 100%</label>
+                <input 
+                  type="number" 
+                  value={editForm.overtime100} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setEditForm(prev => ({
+                      ...prev, 
+                      overtime100: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, prev.overtime50, val, prev.nightHours)
+                    }));
+                  }} 
+                />
+              </div>
+              <div className="form-group">
+                <label>Heures de nuit</label>
+                <input 
+                  type="number" 
+                  value={editForm.nightHours} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    setEditForm(prev => ({
+                      ...prev, 
+                      nightHours: val,
+                      overtimeHours: calculateTotalOvertime(prev.overtime25, prev.overtime50, prev.overtime100, val)
+                    }));
+                  }} 
+                />
+              </div>
+            </div>
+
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancel</button>
-              <button className="btn-submit" onClick={handleSaveEdit}>Save</button>
+              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Annuler</button>
+              <button className="btn-submit" onClick={handleSaveEdit}>Enregistrer</button>
             </div>
           </div>
         </div>
