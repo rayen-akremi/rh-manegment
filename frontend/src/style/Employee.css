@@ -472,3 +472,59 @@ input[type="checkbox"] {
     min-width: 100px;
   }
 }
+/* Styles pour la validation des champs */
+.input-error {
+  border: 2px solid #ef4444 !important;
+  background-color: #fef2f2 !important;
+  box-shadow: 0 0 0 1px #ef4444 !important;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 4px;
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+.error-summary {
+  background-color: #fef2f2;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.error-summary-icon {
+  font-size: 1.2rem;
+}
+
+.error-summary-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.error-summary-list li {
+  margin: 4px 0;
+}
+
+.required-star {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

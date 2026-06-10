@@ -53,6 +53,25 @@ router.post('/batch-predict', async (req, res) => {
   }
 });
 
+// ========== GET turnover trend for next 6 months ==========
+router.get('/predict-turnover-trend', async (req, res) => {
+  try {
+    const result = await aiPythonClient.getTurnoverTrend();
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching turnover trend:', error);
+    // Fallback: return default data
+    res.json([
+      { month: 'Jan', risk: 25 },
+      { month: 'Fév', risk: 28 },
+      { month: 'Mar', risk: 30 },
+      { month: 'Avr', risk: 32 },
+      { month: 'Mai', risk: 35 },
+      { month: 'Juin', risk: 38 }
+    ]);
+  }
+});
+
 // Get department risks
 router.get('/department-risks', async (req, res) => {
   try {

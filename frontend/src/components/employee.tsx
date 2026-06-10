@@ -39,6 +39,21 @@ const Toast: React.FC<{ message: string; type?: 'success' | 'error'; onClose: ()
   );
 };
 
+// Validation error interface
+interface ValidationErrors {
+  prenom?: string;
+  nom?: string;
+  id?: string;
+  matricule?: string;
+  position?: string;
+  department?: string;
+  age?: string;
+  regime?: string;
+  workforceType?: string;
+  gender?: string;
+  joinDate?: string;
+}
+
 const Employee: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +68,10 @@ const Employee: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
   const [newEmployee, setNewEmployee] = useState({
     prenom: '',
@@ -88,29 +107,133 @@ const Employee: React.FC = () => {
     nightHours: 0,
   });
 
-  // Gestionnaires d'événements pour le formulaire d'ajout
+  // Validation functions
+  const validateField = (field: string, value: any): string | undefined => {
+    switch (field) {
+      case 'prenom':
+        if (!value || !value.trim()) return 'Le prénom est requis';
+        if (value.trim().length < 2) return 'Le prénom doit contenir au moins 2 caractères';
+        return undefined;
+      case 'nom':
+        if (!value || !value.trim()) return 'Le nom est requis';
+        if (value.trim().length < 2) return 'Le nom doit contenir au moins 2 caractères';
+        return undefined;
+      case 'id':
+        if (!value || !value.trim()) return "L'ID employé est requis";
+        if (!/^[A-Za-z0-9_-]+$/.test(value)) return "L'ID ne peut contenir que des lettres, chiffres, tirets et underscores";
+        return undefined;
+      case 'matricule':
+        if (!value || !value.trim()) return 'Le matricule est requis';
+        return undefined;
+      case 'position':
+        if (!value || !value.trim()) return 'Le poste est requis';
+        return undefined;
+      case 'department':
+        if (!value || !value.trim()) return 'Le département est requis';
+        return undefined;
+      case 'age':
+        const ageNum = parseInt(value);
+        if (isNaN(ageNum)) return "L'âge doit être un nombre";
+        if (ageNum < 16) return "L'âge doit être au moins 16 ans";
+        if (ageNum > 100) return "L'âge ne peut pas dépasser 100 ans";
+        return undefined;
+      case 'regime':
+        if (!value) return 'Le régime est requis';
+        return undefined;
+      case 'workforceType':
+        if (!value || !value.trim()) return "Le type d'effectif est requis";
+        return undefined;
+      case 'gender':
+        if (!value) return 'Le genre est requis';
+        return undefined;
+      case 'joinDate':
+        if (value) {
+          const date = new Date(value);
+          if (date > new Date()) return "La date d'embauche ne peut pas être dans le futur";
+        }
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  const validateAllFields = (): boolean => {
+    const errors: ValidationErrors = {};
+    let isValid = true;
+
+    // Validate all required fields
+    const fieldsToValidate = ['prenom', 'nom', 'id', 'matricule', 'position', 'department', 'age', 'regime', 'workforceType', 'gender'];
+    
+    fieldsToValidate.forEach(field => {
+      const error = validateField(field, newEmployee[field as keyof typeof newEmployee]);
+      if (error) {
+        errors[field as keyof ValidationErrors] = error;
+        isValid = false;
+      }
+    });
+
+    setValidationErrors(errors);
+    return isValid;
+  };
+
+  const handleFieldBlur = (field: string, value: any) => {
+    setTouchedFields(prev => new Set(prev).add(field));
+    const error = validateField(field, value);
+    setValidationErrors(prev => ({ ...prev, [field]: error }));
+  };
+
+  const getFieldClassName = (field: string): string => {
+    const hasError = validationErrors[field as keyof ValidationErrors] && touchedFields.has(field);
+    return hasError ? 'input-error' : '';
+  };
+
+  // Gestionnaires d'événements pour le formulaire d'ajout avec validation
   const handleNewPrenomChange = (value: string) => {
     setNewEmployee({ ...newEmployee, prenom: value });
+    if (touchedFields.has('prenom')) {
+      const error = validateField('prenom', value);
+      setValidationErrors(prev => ({ ...prev, prenom: error }));
+    }
   };
 
   const handleNewNomChange = (value: string) => {
     setNewEmployee({ ...newEmployee, nom: value });
+    if (touchedFields.has('nom')) {
+      const error = validateField('nom', value);
+      setValidationErrors(prev => ({ ...prev, nom: error }));
+    }
   };
 
   const handleNewIdChange = (value: string) => {
     setNewEmployee({ ...newEmployee, id: value });
+    if (touchedFields.has('id')) {
+      const error = validateField('id', value);
+      setValidationErrors(prev => ({ ...prev, id: error }));
+    }
   };
 
   const handleNewMatriculeChange = (value: string) => {
     setNewEmployee({ ...newEmployee, matricule: value });
+    if (touchedFields.has('matricule')) {
+      const error = validateField('matricule', value);
+      setValidationErrors(prev => ({ ...prev, matricule: error }));
+    }
   };
 
   const handleNewPositionChange = (value: string) => {
     setNewEmployee({ ...newEmployee, position: value });
+    if (touchedFields.has('position')) {
+      const error = validateField('position', value);
+      setValidationErrors(prev => ({ ...prev, position: error }));
+    }
   };
 
   const handleNewDepartmentChange = (value: string) => {
     setNewEmployee({ ...newEmployee, department: value });
+    if (touchedFields.has('department')) {
+      const error = validateField('department', value);
+      setValidationErrors(prev => ({ ...prev, department: error }));
+    }
   };
 
   const handleNewStatusChange = (value: EmployeeStatus) => {
@@ -119,22 +242,42 @@ const Employee: React.FC = () => {
 
   const handleNewAgeChange = (value: number) => {
     setNewEmployee({ ...newEmployee, age: value });
+    if (touchedFields.has('age')) {
+      const error = validateField('age', value);
+      setValidationErrors(prev => ({ ...prev, age: error }));
+    }
   };
 
   const handleNewJoinDateChange = (value: string) => {
     setNewEmployee({ ...newEmployee, joinDate: value });
+    if (touchedFields.has('joinDate')) {
+      const error = validateField('joinDate', value);
+      setValidationErrors(prev => ({ ...prev, joinDate: error }));
+    }
   };
 
   const handleNewRegimeChange = (value: string) => {
     setNewEmployee({ ...newEmployee, regime: value });
+    if (touchedFields.has('regime')) {
+      const error = validateField('regime', value);
+      setValidationErrors(prev => ({ ...prev, regime: error }));
+    }
   };
 
   const handleNewWorkforceTypeChange = (value: string) => {
     setNewEmployee({ ...newEmployee, workforceType: value });
+    if (touchedFields.has('workforceType')) {
+      const error = validateField('workforceType', value);
+      setValidationErrors(prev => ({ ...prev, workforceType: error }));
+    }
   };
 
   const handleNewGenderChange = (value: string) => {
     setNewEmployee({ ...newEmployee, gender: value });
+    if (touchedFields.has('gender')) {
+      const error = validateField('gender', value);
+      setValidationErrors(prev => ({ ...prev, gender: error }));
+    }
   };
 
   const handleNewHtHoursChange = (value: number) => {
@@ -206,6 +349,17 @@ const Employee: React.FC = () => {
     setStatusFilter(value);
   };
 
+  // Reset modal state
+  const resetAddModal = () => {
+    setNewEmployee({
+      prenom: '', nom: '', id: '', matricule: '', position: '', department: '', status: 'Actif',
+      age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, nightHours: 0,
+    });
+    setValidationErrors({});
+    setTouchedFields(new Set());
+    setShowAddModal(false);
+  };
+
   // ========== FETCH EMPLOYEES ==========
   const fetchEmployees = async () => {
     try {
@@ -223,7 +377,6 @@ const Employee: React.FC = () => {
       console.log('📊 [FETCH] Employés normaux reçus:', data.length);
       console.log('📊 [FETCH] Employés importés reçus:', recapData.length);
       
-      // Formater les employés normaux (ajoutés manuellement)
       const formatted: EmployeeData[] = (data || []).map((emp: any) => ({
         id: emp.employee_id || emp._id || '',
         matricule: emp.matricule || '',
@@ -242,7 +395,6 @@ const Employee: React.FC = () => {
         fromRecap: false,
       }));
       
-      // Formater les employés importés (depuis Excel)
       const recapEmployees: EmployeeData[] = (recapData || []).map((item: any) => ({
         id: item.matricule || item._id || '',
         matricule: item.matricule || '',
@@ -261,7 +413,6 @@ const Employee: React.FC = () => {
         fromRecap: true,
       }));
 
-      // Fusionner les deux listes avec un Map pour éviter les doublons
       const employeeMap = new Map();
       
       formatted.forEach(emp => {
@@ -306,14 +457,34 @@ const Employee: React.FC = () => {
     };
   }, []);
 
-  // ========== ADD EMPLOYEE ==========
+  // ========== ADD EMPLOYEE WITH VALIDATION ==========
   const handleAddEmployee = async () => {
-    if (!newEmployee.prenom.trim()) { setToastMessage("Le prénom est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
-    if (!newEmployee.nom.trim()) { setToastMessage("Le nom est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
-    if (!newEmployee.id.trim()) { setToastMessage("L'ID employé est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
-    if (!newEmployee.department.trim()) { setToastMessage("Le département est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
-    if (!newEmployee.position.trim()) { setToastMessage("Le poste est requis"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
-    if (newEmployee.age < 16) { setToastMessage("L'âge doit être au moins 16 ans"); setToastType('error'); setTimeout(() => setToastMessage(null), 3000); return; }
+    // Mark all fields as touched
+    const allFields = ['prenom', 'nom', 'id', 'matricule', 'position', 'department', 'age', 'regime', 'workforceType', 'gender'];
+    const touched = new Set(touchedFields);
+    allFields.forEach(f => touched.add(f));
+    setTouchedFields(touched);
+    
+    // Validate all fields
+    const errors: ValidationErrors = {};
+    let isValid = true;
+    
+    allFields.forEach(field => {
+      const error = validateField(field, newEmployee[field as keyof typeof newEmployee]);
+      if (error) {
+        errors[field as keyof ValidationErrors] = error;
+        isValid = false;
+      }
+    });
+    
+    setValidationErrors(errors);
+    
+    if (!isValid) {
+      setToastMessage("❌ Veuillez corriger les erreurs dans le formulaire");
+      setToastType('error');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
 
     const email = `${newEmployee.prenom.toLowerCase()}.${newEmployee.nom.toLowerCase()}.${newEmployee.id.toLowerCase()}@rh.com`.replace(/[^a-z0-9.@]/g, '');
 
@@ -344,17 +515,13 @@ const Employee: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Erreur serveur');
       
-      setToastMessage(` Employé ${newEmployee.prenom} ${newEmployee.nom} ajouté avec succès !`);
+      setToastMessage(`✅ Employé ${newEmployee.prenom} ${newEmployee.nom} ajouté avec succès !`);
       setToastType('success');
       
       await fetchEmployees();
       window.dispatchEvent(new Event('employee-added'));
       
-      setShowAddModal(false);
-      setNewEmployee({
-        prenom: '', nom: '', id: '', matricule: '', position: '', department: '', status: 'Actif',
-        age: 25, joinDate: '', regime: '', workforceType: '', gender: '', htHours: 0, nightHours: 0,
-      });
+      resetAddModal();
       
       setTimeout(() => setToastMessage(null), 3000);
       
@@ -421,8 +588,7 @@ const Employee: React.FC = () => {
         throw new Error(errData.message);
       }
       
-      // ✅ Message de succès
-      setToastMessage(` Employé ${editForm.prenom} ${editForm.nom} modifié avec succès !`);
+      setToastMessage(`✅ Employé ${editForm.prenom} ${editForm.nom} modifié avec succès !`);
       setToastType('success');
       
       await fetchEmployees();
@@ -494,7 +660,7 @@ const Employee: React.FC = () => {
 
   const handleBulkDelete = async () => {
     if (selectedForDelete.size === 0) {
-      setToastMessage("Sélectionnez au moins un employé");
+      setToastMessage("❌ Sélectionnez au moins un employé");
       setToastType('error');
       setTimeout(() => setToastMessage(null), 3000);
       return;
@@ -647,7 +813,7 @@ const Employee: React.FC = () => {
             <button className="btn-add" onClick={() => setShowAddModal(true)} disabled={isDeleting}>Ajouter</button>
             {selectedForDelete.size > 0 && (
               <button className="btn-delete-bulk" onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting}>
-                {isDeleting ? 'Suppression...' : `Supprimer (${selectedForDelete.size})`}
+                {isDeleting ? 'Suppression...' : `🗑️ Supprimer (${selectedForDelete.size})`}
               </button>
             )}
           </div>
@@ -703,6 +869,7 @@ const Employee: React.FC = () => {
                         className="action-btn edit" 
                         onClick={() => handleEditClick(emp)}
                         disabled={isDeleting}
+                        title="Modifier"
                       >
                         ✏️
                       </button>
@@ -722,75 +889,121 @@ const Employee: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Modal */}
+      {/* Add Modal with Red Error Fields */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" onClick={() => resetAddModal()}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Ajouter un employé</h2>
+            <h2>➕ Ajouter un employé</h2>
             <p>Remplissez les informations pour ajouter un nouveau employé.</p>
+            
+            {/* Affichage des erreurs globales */}
+            {Object.keys(validationErrors).length > 0 && touchedFields.size > 0 && (
+              <div className="error-summary">
+                <span className="error-summary-icon">⚠️</span>
+                <ul className="error-summary-list">
+                  {Object.entries(validationErrors).map(([field, error]) => (
+                    error && touchedFields.has(field) && <li key={field}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Prénom</label>
+                <label>Prénom <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Prénom" 
                   value={newEmployee.prenom} 
-                  onChange={(e) => handleNewPrenomChange(e.target.value)} 
+                  onChange={(e) => handleNewPrenomChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('prenom', e.target.value)}
+                  className={getFieldClassName('prenom')}
                 />
+                {validationErrors.prenom && touchedFields.has('prenom') && (
+                  <span className="error-message">{validationErrors.prenom}</span>
+                )}
               </div>
               <div className="form-group">
-                <label>Nom</label>
+                <label>Nom <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Nom" 
                   value={newEmployee.nom} 
-                  onChange={(e) => handleNewNomChange(e.target.value)} 
+                  onChange={(e) => handleNewNomChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('nom', e.target.value)}
+                  className={getFieldClassName('nom')}
                 />
+                {validationErrors.nom && touchedFields.has('nom') && (
+                  <span className="error-message">{validationErrors.nom}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>ID Employé</label>
+                <label>ID Employé <span className="required-star">*</span></label>
                 <input 
                   type="text" 
-                  placeholder="ID" 
+                  placeholder="ID (ex: EMP001)" 
                   value={newEmployee.id} 
-                  onChange={(e) => handleNewIdChange(e.target.value)} 
+                  onChange={(e) => handleNewIdChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('id', e.target.value)}
+                  className={getFieldClassName('id')}
                 />
+                {validationErrors.id && touchedFields.has('id') && (
+                  <span className="error-message">{validationErrors.id}</span>
+                )}
               </div>
               <div className="form-group">
-                <label>Matricule</label>
+                <label>Matricule <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Matricule" 
                   value={newEmployee.matricule} 
-                  onChange={(e) => handleNewMatriculeChange(e.target.value)} 
+                  onChange={(e) => handleNewMatriculeChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('matricule', e.target.value)}
+                  className={getFieldClassName('matricule')}
                 />
+                {validationErrors.matricule && touchedFields.has('matricule') && (
+                  <span className="error-message">{validationErrors.matricule}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Poste</label>
+                <label>Poste <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Poste" 
                   value={newEmployee.position} 
-                  onChange={(e) => handleNewPositionChange(e.target.value)} 
+                  onChange={(e) => handleNewPositionChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('position', e.target.value)}
+                  className={getFieldClassName('position')}
                 />
+                {validationErrors.position && touchedFields.has('position') && (
+                  <span className="error-message">{validationErrors.position}</span>
+                )}
               </div>
               <div className="form-group">
-                <label>Département</label>
+                <label>Département <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Département" 
                   value={newEmployee.department} 
-                  onChange={(e) => handleNewDepartmentChange(e.target.value)} 
+                  onChange={(e) => handleNewDepartmentChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('department', e.target.value)}
+                  className={getFieldClassName('department')}
                 />
+                {validationErrors.department && touchedFields.has('department') && (
+                  <span className="error-message">{validationErrors.department}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Statut</label>
+                <label>Statut <span className="required-star">*</span></label>
                 <select 
                   value={newEmployee.status} 
                   onChange={(e) => handleNewStatusChange(e.target.value as EmployeeStatus)}
@@ -801,58 +1014,86 @@ const Employee: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label>Âge</label>
+                <label>Âge <span className="required-star">*</span></label>
                 <input 
                   type="number" 
                   value={newEmployee.age} 
-                  onChange={(e) => handleNewAgeChange(parseInt(e.target.value))} 
+                  onChange={(e) => handleNewAgeChange(parseInt(e.target.value))}
+                  onBlur={(e) => handleFieldBlur('age', parseInt(e.target.value))}
+                  className={getFieldClassName('age')}
                 />
+                {validationErrors.age && touchedFields.has('age') && (
+                  <span className="error-message">{validationErrors.age}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
                 <label>Date d'embauche</label>
                 <input 
                   type="date" 
                   value={newEmployee.joinDate} 
-                  onChange={(e) => handleNewJoinDateChange(e.target.value)} 
+                  onChange={(e) => handleNewJoinDateChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('joinDate', e.target.value)}
+                  className={getFieldClassName('joinDate')}
                 />
+                {validationErrors.joinDate && touchedFields.has('joinDate') && (
+                  <span className="error-message">{validationErrors.joinDate}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Régime</label>
+                <label>Régime <span className="required-star">*</span></label>
                 <select 
                   value={newEmployee.regime} 
                   onChange={(e) => handleNewRegimeChange(e.target.value)}
+                  onBlur={() => handleFieldBlur('regime', newEmployee.regime)}
+                  className={getFieldClassName('regime')}
                 >
                   <option value="">Sélectionner</option>
                   <option value="Mensuel">Mensuel</option>
                   <option value="Horaire">Horaire</option>
                   <option value="Journalier">Journalier</option>
                 </select>
+                {validationErrors.regime && touchedFields.has('regime') && (
+                  <span className="error-message">{validationErrors.regime}</span>
+                )}
               </div>
               <div className="form-group">
-                <label>Type d'effectif</label>
+                <label>Type d'effectif <span className="required-star">*</span></label>
                 <input 
                   type="text" 
                   placeholder="Type d'effectif" 
                   value={newEmployee.workforceType} 
-                  onChange={(e) => handleNewWorkforceTypeChange(e.target.value)} 
+                  onChange={(e) => handleNewWorkforceTypeChange(e.target.value)}
+                  onBlur={(e) => handleFieldBlur('workforceType', e.target.value)}
+                  className={getFieldClassName('workforceType')}
                 />
+                {validationErrors.workforceType && touchedFields.has('workforceType') && (
+                  <span className="error-message">{validationErrors.workforceType}</span>
+                )}
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
-                <label>Genre</label>
+                <label>Genre <span className="required-star">*</span></label>
                 <select 
                   value={newEmployee.gender} 
                   onChange={(e) => handleNewGenderChange(e.target.value)}
+                  onBlur={() => handleFieldBlur('gender', newEmployee.gender)}
+                  className={getFieldClassName('gender')}
                 >
                   <option value="">Sélectionner</option>
                   <option value="M">Homme</option>
                   <option value="F">Femme</option>
                 </select>
+                {validationErrors.gender && touchedFields.has('gender') && (
+                  <span className="error-message">{validationErrors.gender}</span>
+                )}
               </div>
               <div className="form-group">
                 <label>Heures (HT)</label>
@@ -864,6 +1105,7 @@ const Employee: React.FC = () => {
                 />
               </div>
             </div>
+            
             <div className="form-row">
               <div className="form-group">
                 <label>Heures de Nuit</label>
@@ -875,8 +1117,9 @@ const Employee: React.FC = () => {
                 />
               </div>
             </div>
+            
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setShowAddModal(false)}>Annuler</button>
+              <button className="btn-cancel" onClick={() => resetAddModal()}>Annuler</button>
               <button className="btn-submit" onClick={handleAddEmployee}>Ajouter</button>
             </div>
           </div>
@@ -887,8 +1130,8 @@ const Employee: React.FC = () => {
       {showEditModal && editingEmployee && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Modifier l'employé</h2>
-            <p>Modifiez les informations de {editingEmployee.name}.</p>
+            <h2>✏️ Modifier l'employé</h2>
+            <p>Modifiez les informations de <strong>{editingEmployee.name}</strong>.</p>
             <div className="form-row">
               <div className="form-group">
                 <label>Prénom</label>
@@ -1028,7 +1271,7 @@ const Employee: React.FC = () => {
             </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Annuler</button>
-              <button className="btn-submit" onClick={handleSaveEdit}>Enregistrer</button>
+              <button className="btn-submit" onClick={handleSaveEdit}>💾 Enregistrer</button>
             </div>
           </div>
         </div>
@@ -1038,12 +1281,12 @@ const Employee: React.FC = () => {
       {showDeleteConfirm && (
         <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>Confirmer la suppression</h2>
-            <p>Êtes-vous sûr de vouloir supprimer {selectedForDelete.size} employé(s) ? Cette action ne peut pas être annulée.</p>
+            <h2>⚠️ Confirmer la suppression</h2>
+            <p>Êtes-vous sûr de vouloir supprimer <strong>{selectedForDelete.size}</strong> employé(s) ? Cette action ne peut pas être annulée.</p>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>Annuler</button>
               <button className="btn-delete" onClick={handleBulkDelete} disabled={isDeleting}>
-                {isDeleting ? 'Suppression...' : 'Supprimer'}
+                {isDeleting ? 'Suppression...' : '🗑️ Supprimer'}
               </button>
             </div>
           </div>
